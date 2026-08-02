@@ -24,6 +24,8 @@ class SimpleState(TypedDict):
 
 def demo_simple_graph():
     # define node functions
+    # A node returns a PARTIAL state dict; LangGraph merges it into the running state.
+    # Keys you omit (here: "input") are left untouched, not cleared.
     def process(state: SimpleState) -> dict:
         # simple processing logic, for demo purposes
         return {"output": state["input"].upper(), "step": state["step"] + 1}
@@ -37,7 +39,8 @@ def demo_simple_graph():
     graph.add_edge(START, "process")
     graph.add_edge("process", END)
 
-    # execute graph/ compile
+    # compile() validates the topology (unreachable nodes, missing START/END path) and
+    # returns a Runnable — the graph is not executable until this happens.
     app = graph.compile()
 
     # # visualize the graph
@@ -62,12 +65,17 @@ def demo_simple_graph():
 # === State with Reducers ===
 
 
+# The second arg of Annotated[...] is the REDUCER: how a node's returned value is
+# combined with the existing value. Without a reducer the default is "overwrite",
+# so each node would clobber the previous one's list instead of appending to it.
 class AccumulatingState(TypedDict):
     messages: Annotated[list[str], operator.add]  # lists concatenate when merged
     count: Annotated[int, operator.add]  # counts sum when merged
 
 
 def demo_accumulating_state():
+    # Each node returns only its OWN delta (a 1-element list, count=1); operator.add
+    # does the accumulating. Returning the full accumulated list here would double it.
     def step_one(state: AccumulatingState) -> dict:
         return {"messages": ["Step 1 executed"], "count": 1}
 
@@ -90,6 +98,7 @@ def demo_accumulating_state():
     print(app.get_graph().draw_mermaid())
 
     # save as PNG
+    # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
     png_bytes = app.get_graph().draw_mermaid_png()
     with open("graph_2.png", "wb") as f:
         f.write(png_bytes)
@@ -106,6 +115,10 @@ def demo_accumulating_state():
 from langgraph.graph import add_messages
 
 
+# add_messages is a smarter reducer than operator.add: it appends new messages, but it
+# also coerces raw dicts/strings into Message objects, assigns ids, and UPSERTS by id —
+# re-emitting a message with an existing id replaces it instead of duplicating it.
+# That id-based replacement is what makes editing/removing history possible.
 class MessageState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
@@ -114,6 +127,8 @@ def demo_message_state():
     llm = init_chat_model("gpt-4o-mini", temperature=0)
 
     def chat_node(state: MessageState) -> dict:
+        # The whole history is passed to the LLM; only the new reply is returned,
+        # because add_messages appends it to what's already in state.
         response = llm.invoke(state["messages"])
         return {"messages": [response]}
 
@@ -195,6 +210,8 @@ def demo_multi_node_graph():
     with open("graph_3.png", "wb") as f:
         f.write(png_bytes)
 
+    # Only "input" is supplied: TypedDict keys are not required at runtime, and each
+    # node fills in its own key as the chain of edges progresses.
     result = app.invoke({"input": "Artificial intelligence"})
 
     print("\nMulti-Node Graph Result:")

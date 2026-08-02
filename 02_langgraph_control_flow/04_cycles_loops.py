@@ -19,8 +19,12 @@ llm = init_chat_model("gpt-4o-mini", temperature=0.0)
 class CodeGenState(TypedDict):
     task: str
     code: str
+    # Accumulated (not overwritten) so the full error history survives every loop pass;
+    # the generator node reads errors[-1] to fix the most recent failure.
     errors: Annotated[list[str], operator.add]
     iteration: int
+    # Carried IN STATE rather than as a module constant so the cap travels with the run
+    # and can be tuned per invocation.
     max_iterations: int
     success: bool
 
@@ -43,6 +47,8 @@ def demo_self_correcting_code():
         response = llm.invoke(prompt)
         code = response.content.strip()
 
+        # LLMs wrap code in ```python fences even when told not to; splitting on ```
+        # takes the fenced body, then the language tag is stripped off the front.
         # Clean up markdown code blocks if present
         if code.startswith("```"):
             code = code.split("```")[1]
@@ -67,15 +73,22 @@ def demo_self_correcting_code():
             ([3, -1, 3, 5, 5], 3),  # duplicates at top
         ]
 
+        # exec into a throwaway namespace so the generated code's definitions can be
+        # looked up by name afterwards without polluting this module's globals.
+        # (Demo only — exec'ing model output is unsafe outside a sandbox.)
         namespace = {}
         try:
             exec(code, namespace)
+        # Broad `except Exception` on purpose: ANY failure must become feedback text
+        # for the next repair iteration rather than crashing the graph.
         except Exception as e:
             return {"errors": [f"Runtime error: {e}"], "success": False}
 
         if "solve" not in namespace:
             return {"errors": ["Function 'solve' not found in code"], "success": False}
 
+        # Fail fast on the first mismatch: one concrete counter-example is a better
+        # repair prompt than a wall of failures.
         for inputs, expected in test_cases:
             try:
                 result = namespace["solve"](inputs)
@@ -97,6 +110,9 @@ def demo_self_correcting_code():
         else:
             return "generate"
 
+    # No-op terminal node. It exists purely to give the conditional edge a concrete
+    # "end" target: routing straight to END is possible but a real node is easier to
+    # extend (logging, persistence) and shows up in the rendered graph.
     def finalize(state: CodeGenState) -> dict:
         return state
 
@@ -147,6 +163,8 @@ def demo_self_correcting_code():
 class ResearchState(TypedDict):
     topic: str
     findings: Annotated[list[str], operator.add]
+    # NOTE: no reducer here, so each node's return REPLACES the list rather than
+    # extending it — only the newest question survives, unlike `findings` above.
     questions: list[str]
     iteration: int
     max_depth: int
@@ -184,6 +202,8 @@ def demo_iterative_research():
 
         print(f"   Next question: {response.content.strip()}")
 
+        # The iteration counter is bumped HERE, not in research(), so one "depth" equals
+        # a full research -> question cycle and the router below counts it correctly.
         return {"questions": [response.content], "iteration": state["iteration"] + 1}
 
     def synthesize(state: ResearchState) -> dict:
@@ -192,6 +212,7 @@ def demo_iterative_research():
             f"🧬 [SYNTHESIZE] Combining {len(state['findings'])} rounds of findings..."
         )
 
+        # Fan-in step: every accumulated round is folded into one final answer.
         all_findings = "\n\n".join(state["findings"])
         response = llm.invoke(
             f"Synthesize these findings into a coherent summary:\n\n{all_findings}"

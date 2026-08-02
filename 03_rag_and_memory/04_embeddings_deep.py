@@ -25,6 +25,8 @@ def batch_embeddings():
         "How does a neural network work?",
     ]
 
+    # embed_documents sends the whole list in ONE API call — far cheaper and faster than
+    # looping embed_query. (Some models also encode documents/queries asymmetrically.)
     batch_embedding = embeddings.embed_documents(text)
     for i, emb in enumerate(batch_embedding):
         print(f"Text {i+1} - Vector dimensions: {len(emb)}")
@@ -50,7 +52,9 @@ def similarity_search():
     doc_vector = embeddings_model.embed_documents(docs)
     query_vector = embeddings_model.embed_query(query)
 
-    # compute cosine similarities
+    # Cosine (angle) rather than Euclidean distance: it ignores vector magnitude, so
+    # long and short texts about the same topic still score as similar. This is the
+    # exact computation a vector store does for you under the hood.
     def cosine_similarity(vec1, vec2):
         return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
@@ -75,6 +79,9 @@ def embedding_caching():
     with tempfile.TemporaryDirectory() as tempdir:
         store = LocalFileStore(root_path=tempdir)
 
+        # Caches by hash of the text, so re-indexing an unchanged corpus costs nothing.
+        # namespace should encode the embedding MODEL — otherwise switching models would
+        # silently return stale vectors of the wrong dimensionality from the same keys.
         cached_embeddings = CacheBackedEmbeddings.from_bytes_store(
             underlying_embeddings=embeddings_model,
             document_embedding_cache=store,
@@ -83,6 +90,8 @@ def embedding_caching():
 
         text = "What is Reinforcement Learning?"
 
+        # Note: only embed_documents is cached — embed_query is not, by design, since
+        # queries are usually unique and caching them would just bloat the store.
         # First call - hits API
         print("First call (API):")
         vectors1 = cached_embeddings.embed_documents([text])

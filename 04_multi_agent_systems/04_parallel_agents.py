@@ -16,6 +16,10 @@ llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
 
 
 class ParallelState(TypedDict):
+    # Each parallel branch writes to its OWN key. That's why no reducer is needed: the
+    # three agents never touch the same field, so their updates can't conflict.
+    # If they all wrote to one key, LangGraph would raise a concurrent-update error
+    # unless that key had a reducer to merge the writes.
     query: str
     research_result: str
     creative_result: str
@@ -91,11 +95,14 @@ def create_parallel_research():
     graph.add_node("technical", technical_agent)
     graph.add_node("synthesize", synthesize)
 
-    # Fan-out: START goes to all three agents
+    # Fan-out: multiple edges from one source run CONCURRENTLY (one superstep), so the
+    # three LLM calls happen in parallel — wall time is the slowest agent, not the sum.
     graph.add_edge(START, "research")
     graph.add_edge(START, "creative")
     graph.add_edge(START, "technical")
 
+    # Fan-in: LangGraph automatically waits for ALL three branches to finish before
+    # running synthesize once (not three times) — no explicit join/barrier needed.
     graph.add_edge("research", "synthesize")
     graph.add_edge("creative", "synthesize")
     graph.add_edge("technical", "synthesize")
@@ -143,6 +150,9 @@ def create_map_reduce_summarizer():
 
     def map_summarize(state: MapReduceState) -> dict:
         """Summarize each document (runs in parallel for each)."""
+        # NOTE: despite the docstring this loop is SEQUENTIAL — it's one node doing N
+        # calls in a row. True per-document parallelism needs LangGraph's Send API to
+        # spawn one node instance per document (or .batch() on the model).
         summaries = []
         for doc in state["documents"]:
             response = llm.invoke(
@@ -156,6 +166,8 @@ def create_map_reduce_summarizer():
 
     def reduce_combine(state: MapReduceState) -> dict:
         """Combine all summaries."""
+        # The "reduce" half: only the compressed summaries reach this call, which is the
+        # whole point — it lets you summarize a corpus far larger than the context window.
         all_summaries = "\n\n".join(
             [f"Summary {i+1}: {s}" for i, s in enumerate(state["summaries"])]
         )

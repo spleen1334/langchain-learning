@@ -14,7 +14,8 @@ load_dotenv()
 
 # print(messages)
 
-# multi-message templates
+# Multi-message template: {placeholders} in ANY message (including the system one)
+# are filled by the single format_messages() call below.
 prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -68,6 +69,8 @@ example_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
+# Expands each example dict into a human/ai message pair, so the model sees the
+# examples as a fake prior conversation rather than as instructions in the prompt text.
 fewshot_prompt = FewShotChatMessagePromptTemplate(
     example_prompt=example_prompt,
     examples=examples,
@@ -76,6 +79,7 @@ fewshot_prompt = FewShotChatMessagePromptTemplate(
 final_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", "Give the opposite of each word."),
+        # A prompt template can be nested inside another one; it is spliced in as messages.
         fewshot_prompt,
         ("human", "{input}"),
     ]
@@ -93,7 +97,8 @@ system_prompt = ChatPromptTemplate.from_messages([("system", "You are a {role}."
 
 user_prompt = ChatPromptTemplate.from_messages([("human", "{question}")])
 
-# Combine
+# `+` on prompt templates concatenates their message lists and unions their
+# input variables — handy for reusing a shared system prompt across several chains.
 full_prompt = system_prompt + user_prompt
 
 

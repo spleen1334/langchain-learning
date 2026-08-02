@@ -49,10 +49,15 @@ def create_message_passing_pipeline():
         )
         return {
             "messages": [
+                # name= is a first-class field on AIMessage (passed to the provider),
+                # unlike the "[RESEARCHER]" text prefix which is only for human readers
+                # and for the downstream agents reading the transcript.
                 AIMessage(
                     content=f"[RESEARCHER]: {response.content}", name="researcher"
                 )
             ],
+            # Informational only in this pipeline — the edges are fixed, so nothing
+            # actually routes on current_phase (contrast with the conditional edges elsewhere).
             "current_phase": "fact_checker",
         }
 
@@ -67,6 +72,8 @@ def create_message_passing_pipeline():
                         "Keep it to 2-3 sentences."
                     )
                 ),
+                # Each agent gets a fresh system prompt but the SAME accumulated history —
+                # that shared transcript is the entire communication channel here.
                 *state["messages"],
             ]
         )
@@ -141,6 +148,9 @@ def demo_message_passing():
 class SharedFieldsState(TypedDict):
     query: str
     # Each agent writes to its own field — others can read it
+    # Typed fields instead of free text: downstream agents get parseable data rather
+    # than having to re-read prose. Trade-off vs message passing — precise, but the
+    # schema must be agreed up front and agents can't share unanticipated info.
     raw_data: Annotated[list[dict], operator.add]
     analysis: str
     recommendations: list[str]
@@ -165,6 +175,9 @@ def create_shared_fields_pipeline():
             ]
         )
 
+        # Hand-parsing JSON from prose is fragile — this whole block is why
+        # with_structured_output (used by the critic below) is the better tool.
+        # The fallback wraps the raw text so the pipeline degrades instead of crashing.
         try:
             data = json.loads(response.content)
         except json.JSONDecodeError:
@@ -196,6 +209,9 @@ def create_shared_fields_pipeline():
         analysis = content
         confidence = 0.7  # default
 
+        # Splitting on a marker the prompt asked for: brittle by design here to contrast
+        # with structured output. The 0.7 default keeps the pipeline running if the model
+        # ignores the format or emits a non-numeric confidence.
         if "CONFIDENCE:" in content:
             parts = content.split("CONFIDENCE:")
             analysis = parts[0].replace("ANALYSIS:", "").strip()
@@ -287,6 +303,8 @@ class BlackboardState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     # Blackboard fields — the shared workspace
     topic: str
+    # Both accumulate rather than overwrite, so the full revision history stays on the
+    # blackboard; the agents read [-1] for the latest but nothing is destroyed.
     drafts: Annotated[list[str], operator.add]
     critiques: Annotated[list[str], operator.add]
     iteration: int
@@ -309,6 +327,8 @@ def create_blackboard_system():
         """Reads critiques from blackboard, writes improved draft."""
         context_parts = [f"Topic: {state['topic']}"]
 
+        # Same node handles both first draft and revisions: the blackboard being empty
+        # IS the "first iteration" signal, so no separate node or flag is needed.
         if state["drafts"]:
             context_parts.append(f"Previous draft: {state['drafts'][-1]}")
         if state["critiques"]:
@@ -363,7 +383,9 @@ def create_blackboard_system():
             ]
         )
 
-        # Force approval after 3 iterations to prevent infinite loops
+        # Hard cap in CODE, not just the prompt: a strict critic could otherwise reject
+        # forever and the drafter<->critic cycle would never terminate. Prompt-level
+        # "be lenient after 3" is a hint; this `or` is the actual guarantee.
         approved = decision.approved or state["iteration"] >= 3
 
         result = {
@@ -376,6 +398,8 @@ def create_blackboard_system():
             ],
         }
 
+        # Only record a critique when revision is needed — approval feedback would
+        # otherwise be fed back to the drafter as if it were a change request.
         if not approved:
             result["critiques"] = [decision.feedback]
 

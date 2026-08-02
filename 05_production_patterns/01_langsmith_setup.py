@@ -13,10 +13,14 @@ from langsmith import traceable
 
 load_dotenv()
 
-# Enable tracing
+# Tracing is driven entirely by env vars (LANGSMITH_TRACING / LANGSMITH_API_KEY /
+# LANGSMITH_PROJECT) — no code changes needed to instrument a chain. Set AFTER
+# load_dotenv() so it overrides whatever the .env file said.
 os.environ["LANGSMITH_TRACING"] = "true"
 
 
+# LCEL chains are traced automatically; @traceable adds a PARENT span around them so
+# your own function shows up as one logical run with the chain nested inside it.
 @traceable(name="basic_chaining")
 def demo_basic_tracing():
     """Basic LangSmith tracing."""
@@ -36,6 +40,8 @@ def demo_basic_tracing():
     print("\nCheck LangSmith dashboard for trace details.")
 
 
+# Tags are the filter/grouping dimension in the LangSmith UI — the practical way to
+# separate e.g. prod from dev traffic within one project.
 @traceable(name="named_runs_demo", tags=["production", "summarization"])
 def demo_named_runs():
     """Name your runs for easier identification."""
@@ -62,7 +68,9 @@ def demo_trace_with_metadata(user_id: str, request_type: str):
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-    # Metadata is automatically captured
+    # @traceable records the function's ARGUMENTS as the run's inputs, so user_id and
+    # request_type land in the trace automatically — that's the "metadata" here.
+    # Corollary: never pass secrets/PII to a traced function unless you want them stored.
     result = llm.invoke(f"Hello from user {user_id}")
 
     return result.content

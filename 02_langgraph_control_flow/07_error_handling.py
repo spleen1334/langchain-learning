@@ -43,14 +43,18 @@ def with_retry(
                 except exceptions as e:
                     last_exception = e
                     if attempt < max_retries - 1:
+                        # Exponential backoff, capped so a long retry chain can't sleep forever.
                         delay = min(base_delay * (2**attempt), max_delay)
-                        # Add jitter
+                        # Jitter (0.5x–1.5x) de-synchronises many clients retrying at once,
+                        # which otherwise re-creates the traffic spike that caused the failure.
                         delay = delay * (0.5 + random.random())
                         print(
                             f"Attempt {attempt + 1} failed: {e}. Retrying in {delay:.1f}s..."
                         )
                         time.sleep(delay)
 
+            # No sleep after the final attempt; the original exception is re-raised so
+            # the caller sees the real cause rather than a generic "retries exhausted".
             raise last_exception
 
         return wrapper
@@ -90,6 +94,11 @@ class CircuitBreaker:
         self.recovery_timeout = recovery_timeout
         self.failures = 0
         self.last_failure_time = 0
+        # State machine:
+        #   closed    = normal, calls pass through and failures are counted
+        #   open      = tripped, calls are rejected instantly (no load on a dying service)
+        #   half-open = probation after recovery_timeout; ONE trial call decides whether
+        #               to close again (success) or re-open (failure)
         self.state = "closed"  # closed, open, half-open
 
     def call(self, func: Callable, *args, **kwargs):
@@ -100,6 +109,7 @@ class CircuitBreaker:
             if time.time() - self.last_failure_time > self.recovery_timeout:
                 self.state = "half-open"
             else:
+                # Fail fast without calling the service — that's the point of the breaker.
                 raise Exception("Circuit breaker is OPEN")
 
         try:
@@ -112,6 +122,8 @@ class CircuitBreaker:
 
             return result
 
+        # Catch-all on purpose: the breaker treats ANY failure of the wrapped call as a
+        # health signal, then re-raises untouched so the caller still sees the real error.
         except Exception:
             self.failures += 1
             self.last_failure_time = time.time()
@@ -168,6 +180,8 @@ class FallbackChain:
         ]
         self.cache = {}
 
+    # @traceable sends this function to LangSmith as a single named span, so the
+    # fallbacks/cache hits show up as one logical operation in the trace tree.
     @traceable(name="fallback_invoke")
     def invoke(self, query: str, use_cache: bool = True) -> tuple[str, str]:
         """
@@ -191,6 +205,8 @@ class FallbackChain:
 
                 return result, model_name
 
+            # Errors are collected rather than raised so the NEXT model gets a chance;
+            # only if every provider fails do we surface the accumulated list.
             except Exception as e:
                 errors.append(f"{model_name}: {e!s}")
                 continue
@@ -251,6 +267,9 @@ def create_robust_agent():
 
             return {"messages": [response], "success": True, "error": None}
 
+        # The exception is converted into STATE, not propagated. An exception escaping a
+        # node aborts the whole graph; recording it lets the conditional edge below decide
+        # whether to retry or degrade gracefully.
         except Exception as e:
             return {
                 "error": str(e),
@@ -266,6 +285,8 @@ def create_robust_agent():
         else:
             return "error"
 
+    # Graceful degradation: retries exhausted, so return a user-facing apology message
+    # instead of letting the graph blow up.
     def handle_error(state: RobustState) -> dict:
         return {
             "messages": [
@@ -290,6 +311,7 @@ def create_robust_agent():
     graph.add_conditional_edges(
         "process",
         should_continue,
+        # "retry" points back at the source node — retrying is just a self-loop edge.
         {"retry": "process", "error": "handle_error", "success": "finalize"},
     )
     graph.add_edge("handle_error", END)

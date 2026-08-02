@@ -37,10 +37,13 @@ def demo_memory_saver():
     graph.add_edge(START, "chat")
     graph.add_edge("chat", END)
 
+    # A checkpointer makes the graph stateful ACROSS invoke() calls. MemorySaver keeps
+    # everything in a process-local dict — fine for dev, lost on restart.
     saver = MemorySaver()
     app = graph.compile(checkpointer=saver)
 
-    # Configuration with thread_id
+    # thread_id is the conversation key: the same id resumes the same state, a different
+    # id starts a clean one. Passing no config at all with a checkpointer is an error.
     config = {"configurable": {"thread_id": "user-123"}}
 
     print("Memory Saver Demo (Multi-turn conversation):\n")
@@ -51,7 +54,8 @@ def demo_memory_saver():
     )
     print(f"Turn 1 - AI: {result['messages'][-1].content}")
 
-    # Turn 2 - Conversation continues
+    # Only the NEW message is passed in — the checkpointer reloads the prior messages
+    # and the operator.add reducer appends this one, so the LLM sees the full history.
     result = app.invoke({"messages": [HumanMessage(content="What's my name?")]}, config)
     print(f"Turn 2 - AI: {result['messages'][-1].content}")
 
@@ -79,6 +83,8 @@ def demo_sqlite_persistence():
     print("\nSQLite Persistence Demo:")
     print(f"Database: {db_path}\n")
 
+    # from_conn_string is a context manager because it owns the DB connection; the graph
+    # must be compiled INSIDE the `with` or the checkpointer's connection is already closed.
     # First session
     with SqliteSaver.from_conn_string(db_path) as saver:
         app = graph.compile(checkpointer=saver)
@@ -96,6 +102,8 @@ def demo_sqlite_persistence():
 
         # PostgresSaver with a real database!
         # Simulate app restart - new session
+    # Fresh saver, fresh compile, SAME db file + SAME thread_id => the conversation is
+    # recovered from disk. This is the whole point of SqliteSaver over MemorySaver.
     with SqliteSaver.from_conn_string(db_path) as saver:
         app = graph.compile(checkpointer=saver)
         config = {"configurable": {"thread_id": "persistent-user"}}
@@ -135,7 +143,8 @@ def demo_state_inspection():
     print(f"  Next node: {state.next}")
     print(f"  Message count: {len(state.values['messages'])}")
 
-    # Get state history
+    # get_state_history yields snapshots NEWEST-FIRST, so checkpoint 0 here is the most
+    # recent one; the loop breaks early because a long thread has many checkpoints.
     print("\nState history:")
     for i, snapshot in enumerate(app.get_state_history(config)):
         print(f"  Checkpoint {i}: {len(snapshot.values['messages'])} messages")
@@ -172,6 +181,8 @@ def demo_branching_conversations():
 
     # Branch A - Beach vacation
     branch_a_config = {"configurable": {"thread_id": "branch-beach"}}
+    # Forking = writing the parent thread's state into a NEW thread_id. Both branches
+    # then evolve independently and neither can affect "main".
     # Copy state to new thread
     app.update_state(branch_a_config, main_state.values)
 
@@ -301,7 +312,8 @@ def demo_checkpoint_internals():
         checkpoint_id = snapshot.config["configurable"]["checkpoint_id"]
         current_step = snapshot.values.get("step", "")
 
-        # Which node just wrote to this checkpoint?
+        # metadata["writes"] is keyed by node name, so its first key identifies the
+        # node that produced this checkpoint (empty for the initial input checkpoint).
         node_name = next(iter(writes.keys())) if writes else "—"
 
         print(f"  Checkpoint {i}:")
@@ -336,6 +348,8 @@ def demo_checkpoint_internals():
         print(f"  state.step at that point: '{target_snapshot.values.get('step', '')}'")
 
         # You can resume from this exact checkpoint
+        # Adding checkpoint_id to the config addresses ONE specific snapshot instead of
+        # the thread's latest — this is how time travel / replay works.
         rewind_config = {
             "configurable": {"thread_id": "internals-demo", "checkpoint_id": target_id}
         }

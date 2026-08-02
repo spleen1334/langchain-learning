@@ -37,6 +37,9 @@ class ResearchState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     topic: str
     search_queries: list[str]
+    # MUST have a reducer: several search_agent instances write this key CONCURRENTLY,
+    # and without operator.add LangGraph raises an InvalidUpdateError on the conflict.
+    # With it, every agent's list is merged into one.
     findings: Annotated[list[dict], operator.add]
     analysis: str
     report: str
@@ -46,6 +49,9 @@ class ResearchState(TypedDict):
 
 
 # State for individual search tasks (used with Send API)
+# A SEPARATE, narrower schema for the Send-spawned workers: each one only needs its own
+# query, not the whole research state. `findings` is repeated here because that's the key
+# the worker writes back into the parent state.
 class SearchTaskState(TypedDict):
     search_query: str
     findings: Annotated[list[dict], operator.add]
@@ -83,6 +89,8 @@ def supervisor(state: ResearchState) -> dict:
         ]
 
     return {
+        # Hard cap at 3 regardless of what the model returned — the fan-out width below
+        # is driven by this list, so an over-eager model would multiply the API spend.
         "search_queries": queries[:3],
         "messages": [
             AIMessage(
@@ -124,7 +132,8 @@ def search_agent(state: SearchTaskState) -> dict:
     except json.JSONDecodeError:
         results = [{"title": query, "detail": response.content}]
 
-    # Tag each finding with the query it came from
+    # Tagging is essential under fan-in: once operator.add merges every worker's results
+    # into one flat list, this field is the only record of which query produced what.
     for r in results:
         r["source_query"] = query
 
@@ -138,6 +147,12 @@ def search_agent(state: SearchTaskState) -> dict:
 
 def dispatch_searches(state: ResearchState) -> list[Send]:
     """Dynamically create parallel search tasks using Send API."""
+    # This is the real map-reduce fan-out (vs. the fixed START->3-nodes pattern):
+    # Send(node_name, payload) spawns ONE INSTANCE of "search_agent" per query, each with
+    # its own private state, all running concurrently. The number of instances is decided
+    # at RUNTIME from the data, so the graph doesn't need N pre-declared nodes.
+    # Each instance's return value is merged back into the parent via the reducers,
+    # which is the "reduce" half — hence findings needing operator.add.
     return [
         Send("search_agent", {"search_query": query, "findings": []})
         for query in state["search_queries"]
@@ -191,6 +206,8 @@ def report_writer(state: ResearchState) -> dict:
     """Writes a structured research report from the analysis."""
 
     # Include quality feedback if this is a revision
+    # Same node serves both the first draft and every revision; the iteration counter is
+    # what makes it inject the critic's feedback on later passes.
     revision_note = ""
     if state["iteration"] > 0 and state.get("quality_feedback"):
         revision_note = (
@@ -198,6 +215,8 @@ def report_writer(state: ResearchState) -> dict:
             f"Address this feedback: {state['quality_feedback']}"
         )
 
+    # The higher-temperature model is used HERE only: prose benefits from variation,
+    # whereas planning/analysis/review stay at temperature=0 for consistency.
     response = creative_llm.invoke(
         [
             SystemMessage(
@@ -271,6 +290,8 @@ def quality_checker(state: ResearchState) -> dict:
         ]
     )
 
+    # Local variable only — used for the log message below. The ACTUAL loop exit is
+    # decided by quality_gate(), which re-derives the same condition from state.
     # Force approve after 2 iterations to prevent infinite loops
     approved = review.approved or state["iteration"] >= 2
 
@@ -319,10 +340,13 @@ def create_research_system():
     # Edges
     graph.add_edge(START, "supervisor")
 
-    # Supervisor → parallel search agents (dynamic fan-out)
+    # Send-based dispatch is wired as a CONDITIONAL edge whose function returns Send
+    # objects instead of a route key; the third arg just declares the possible targets
+    # so the graph can be drawn correctly.
     graph.add_conditional_edges("supervisor", dispatch_searches, ["search_agent"])
 
-    # All search agents → analyst (fan-in)
+    # One edge covers all spawned instances: LangGraph waits for EVERY Send task to
+    # finish before running analyst once with the merged findings.
     graph.add_edge("search_agent", "analyst")
 
     # Analyst → report writer
@@ -365,7 +389,8 @@ def demo_research_with_streaming():
         "iteration": 0,
     }
 
-    # Stream updates to see each step as it happens
+    # stream_mode="updates" yields only each node's DELTA as it completes (vs "values",
+    # which re-emits the entire state every step) — ideal for a progress log.
     for step in system.stream(initial_state, stream_mode="updates"):
         for node_name, update in step.items():
             print(f"[{node_name}] completed")
@@ -390,6 +415,9 @@ def demo_research_with_streaming():
 
 def quality_gate(state: ResearchState) -> Literal["report_writer", "end"]:
     """Route back to writer if quality is insufficient."""
+    # Two exits: good enough, OR budget spent. The iteration cap is the hard guarantee —
+    # without it a persistently harsh reviewer would loop until the recursion limit.
+    # Note iteration was already incremented by quality_checker before this runs.
     if state["quality_score"] >= 0.7 or state["iteration"] >= 2:
         return "end"
     return "report_writer"
@@ -400,7 +428,8 @@ def demo_individual_search():
 
     print("Individual Search Agent Test:\n")
 
-    # Test the search agent directly
+    # Nodes are plain functions of state, so they can be called directly with a dict —
+    # no graph, no API of its own. That makes each agent independently unit-testable.
     result = search_agent(
         {"search_query": "LangGraph multi-agent patterns", "findings": []}
     )

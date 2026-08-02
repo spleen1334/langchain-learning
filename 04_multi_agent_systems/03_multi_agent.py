@@ -12,6 +12,9 @@ load_dotenv()
 
 
 class SupervisorState(TypedDict):
+    # Shared "blackboard": every agent reads and appends to this one list, which is how
+    # they see each other's work. operator.add is enough here since all agents emit
+    # already-built Message objects (add_messages would additionally dedupe by id).
     messages: Annotated[list[BaseMessage], operator.add]  # conversation history
     next_agent: str  # the agent that should act next
     task_complete: bool  # whether the task is complete or not
@@ -31,7 +34,8 @@ class RouteDecision(BaseModel):
     reasoning: str = Field(description="Why this agent was chosen")
 
 
-# Create structured output for reliable routing
+# Structured output is what makes routing reliable: the Literal above is enforced as a
+# JSON-schema enum by the provider, so `decision.next` is always a valid node key.
 supervisor_llm = llm.with_structured_output(RouteDecision)
 
 
@@ -46,7 +50,8 @@ def supervisor(state: SupervisorState) -> dict:
 
     Based on the conversation, decide which agent should act next.
 
-    Workflow:
+    Workflow (encoded in the PROMPT, not the graph — the graph allows any order;
+    this text is the only thing steering the sequence, including the critic->writer loop):
     - Start with researcher to gather facts
     - Then writer to create content
     - Then critic to review
@@ -104,7 +109,8 @@ def writer(state: SupervisorState) -> dict:
     - Match the requested format and tone
     - If there's critic feedback, incorporate it"""
 
-    # Get recent context (research + any feedback)
+    # Last 5 messages ≈ research output + supervisor note + any critic feedback, which is
+    # what the writer needs. Bounded so prompt size doesn't grow with each revision loop.
     context = "\n".join([m.content for m in state["messages"][-5:]])
 
     response = llm.invoke(
@@ -153,6 +159,8 @@ def finalize(state: SupervisorState) -> dict:
 
 def route_to_agent(state: SupervisorState) -> str:
     """Route based on Supervisor's decision."""
+    # task_complete is checked FIRST: on FINISH the supervisor leaves next_agent as
+    # "FINISH", which is not a node — this flag is what diverts to finalize instead.
     if state.get("task_complete"):
         return "finalize"
     return state["next_agent"]
@@ -186,7 +194,9 @@ def build_multi_agent_system():
         },
     )
 
-    # After each specialist, go back to Supervisor
+    # Every specialist returns to the supervisor rather than calling the next one —
+    # centralised control means one place decides the flow, and adding a new specialist
+    # only requires a new node + mapping entry, not rewiring the other agents.
     graph.add_edge("researcher", "supervisor")
     graph.add_edge("writer", "supervisor")
     graph.add_edge("critic", "supervisor")

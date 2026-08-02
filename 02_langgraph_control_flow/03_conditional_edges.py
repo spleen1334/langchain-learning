@@ -34,9 +34,14 @@ def demo_basic_routing():
     def handle_statement(state: RouterState) -> dict:
         return {"response": f"[Acknowledged] Thanks for sharing: {state['query']}"}
 
+    # A routing function decides the NEXT node, it does not modify state. It returns a
+    # key, not a node name — the mapping dict below translates key -> node. The Literal
+    # return type documents the allowed keys (and lets LangGraph draw the edges properly).
     def route_by_type(
         state: RouterState,
     ) -> Literal["question", "command", "statement"]:
+        # Substring checks, not ==, because the classifier LLM may answer "Question."
+        # or add stray text; "statement" is the catch-all so routing can never fail.
         qt = state["query_type"]
         if "question" in qt:
             return "question"
@@ -112,6 +117,8 @@ def demo_conditional_loop():
         try:
             score = int(response.content.strip())
         except ValueError:
+            # LLM returned prose instead of a bare number. Defaulting to a mid score
+            # keeps the loop running (and below the 7 threshold, so it retries).
             score = 5
         return {"quality_score": score}
 
@@ -127,6 +134,9 @@ def demo_conditional_loop():
             "feedback": f"Approved after {state['iteration']} iterations with score {state['quality_score']}",
         }
 
+    # Two independent exit conditions: quality good enough, OR iteration budget spent.
+    # The iteration cap is essential — an LLM that never scores >= 7 would loop forever
+    # (LangGraph would eventually raise GraphRecursionError, which is a crash, not a result).
     def should_continue(state: QualityState) -> Literal["improve", "finalize"]:
         if state["quality_score"] >= 7:
             return "finalize"
@@ -147,6 +157,8 @@ def demo_conditional_loop():
         "evaluate", should_continue, {"improve": "improve", "finalize": "finalize"}
     )
 
+    # This back-edge is what makes the graph cyclic — impossible in a plain LCEL chain,
+    # and the core reason to reach for LangGraph.
     graph.add_edge("improve", "evaluate")  # Loop back!
     graph.add_edge("finalize", END)
 
@@ -228,6 +240,8 @@ def demo_multi_path_routing():
             "result": "Added to standard queue",
         }
 
+    # Routing on a combination of two independent state fields: one conditional edge
+    # collapses a 2x2 matrix into four destinations, rather than chaining two branches.
     def route_task(state: TaskState) -> str:
         is_urgent = "urgent" in state["urgency"]
         is_complex = "complex" in state["complexity"]

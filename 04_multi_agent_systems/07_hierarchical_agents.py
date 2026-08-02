@@ -23,8 +23,14 @@ llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 # ============================================================
 
 
+# ONE schema shared by the parent graph and every subgraph. That's what lets a compiled
+# subgraph be dropped in as a plain node: matching state keys means LangGraph can pass
+# state straight through. Mismatched schemas would require an explicit wrapper function
+# to translate between parent and child state.
 class TeamState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
+    # No reducer: whichever team runs last overwrites it — fine here because exactly
+    # one department handles each request.
     final_answer: str
 
 
@@ -35,10 +41,13 @@ class TeamState(TypedDict):
 
 def build_research_team() -> StateGraph:
     """Build the research department subgraph."""
+    # Returns the UNCOMPILED StateGraph so the caller decides when to compile — the
+    # same builder can then be run standalone or embedded in the parent graph.
 
     def web_researcher(state: TeamState) -> dict:
         """Searches the web for information."""
-        # Extract the query from the last human message
+        # Scans backwards for the last HumanMessage: inside the parent graph the CEO has
+        # already appended AIMessages, so messages[-1] would be routing chatter, not the task.
         query = ""
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
@@ -116,6 +125,8 @@ def build_research_team() -> StateGraph:
                     content=f"[RESEARCH LEAD]: {response.content}", name="research_lead"
                 )
             ],
+            # Each department's LAST node sets final_answer — the contract that lets the
+            # parent graph read one field regardless of which subgraph ran.
             "final_answer": response.content,
         }
 
@@ -126,6 +137,8 @@ def build_research_team() -> StateGraph:
     research_graph.add_node("paper_reviewer", paper_reviewer)
     research_graph.add_node("research_lead", research_lead)
 
+    # Parallelism works the same inside a subgraph as at the top level; add_messages
+    # safely merges the two branches' concurrent writes to `messages`.
     # Fan-out: both researchers work in parallel
     research_graph.add_edge(START, "web_researcher")
     research_graph.add_edge(START, "paper_reviewer")
@@ -353,6 +366,10 @@ def create_hierarchical_system():
 
     def route_to_department(state: TeamState) -> str:
         """Read the CEO's routing decision from the last message."""
+        # Fragile by comparison with the schema above: the decision object is discarded
+        # by ceo_supervisor, so the choice has to be recovered by substring-matching the
+        # message TEXT (and the reasoning text can mention another department).
+        # Storing decision.department in a state field would be the robust fix.
         last_ai = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, AIMessage) and msg.name == "ceo":
@@ -371,6 +388,9 @@ def create_hierarchical_system():
     parent = StateGraph(TeamState)
 
     parent.add_node("ceo", ceo_supervisor)
+    # A compiled graph IS a Runnable, so it can be added as a node directly. The parent
+    # sees one opaque step; internally the whole sub-workflow runs (and its checkpoints
+    # and LangSmith traces nest under the parent's).
     parent.add_node("research_team", research_team)  # compiled subgraph
     parent.add_node("content_team", content_team)  # compiled subgraph
     parent.add_node("analysis_team", analysis_team)  # compiled subgraph
@@ -444,6 +464,8 @@ def demo_hierarchical_trace():
 
     for i, msg in enumerate(result["messages"]):
         if isinstance(msg, AIMessage):
+            # Messages produced inside the subgraphs surface in the parent's final state,
+            # so `name` is what lets you tell which level/agent emitted each step.
             label = msg.name or "unknown"
             print(f"[Step {i}] {label}:")
             print(f"  {msg.content[:150]}...")

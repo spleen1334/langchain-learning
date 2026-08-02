@@ -11,8 +11,13 @@ load_dotenv()
 
 
 class ConversationState(TypedDict):
+    # Plain strings here (not Message objects), so operator.add is enough — no need for
+    # the add_messages reducer, which exists to dedupe/coerce real BaseMessage objects.
     messages: Annotated[list, operator.add]
+    # No reducer => last write wins; each run overwrites the classification.
     sentiment: str
+    # Also unreduced, which is why the counter below never actually accumulates
+    # across invoke() calls (see demo_conversation).
     response_count: int
 
 
@@ -46,6 +51,8 @@ def create_conversation_graph():
             "neutral": "Respond helpfully and informatively.",
         }
 
+        # .get with a default guards against the LLM returning anything off-script
+        # (e.g. "Positive." or a full sentence) — free-text classification is not reliable.
         prompt = system_prompts.get(sentiment, system_prompts["neutral"])
 
         response = llm.invoke(
@@ -85,6 +92,8 @@ def demo_conversation():
     
     print("Conversation Graph Demo:\n")
 
+    # Each invoke() starts from a fresh state — without a checkpointer the graph keeps
+    # nothing between runs, so these three messages are independent, not one conversation.
     for msg in test_messages:
         result = app.invoke({
             "messages": [f"Human: {msg}"],

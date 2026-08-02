@@ -21,7 +21,8 @@ def demo_basic_chain():
     model = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
     parser = StrOutputParser()
 
-    # Compose with pipe operator
+    # Every component is a Runnable, so `|` builds a single composed Runnable.
+    # StrOutputParser at the end unwraps the AIMessage into a plain str.
     chain = prompt | model | parser
 
     # Execute the chain with an input
@@ -45,6 +46,7 @@ def demo_batch_exectution():
         {"text": "What is your name?"},
         {"text": "Where is the nearest restaurant?"},
     ]
+    # .batch() fires the requests concurrently (not a sequential loop) and preserves input order.
     results = chain.batch(inputs)
 
     for text in zip(inputs, results):
@@ -62,7 +64,9 @@ def demo_streaming():
 
     chain = prompt | model | parser
 
-    # Streaming - run with streaming enabled
+    # .stream() yields token chunks as they arrive instead of blocking until the full
+    # answer is ready like .invoke(). Streaming only works if every component in the
+    # chain supports it — a non-streaming step would buffer the whole output first.
     print("Streaming output: ")
     for chunk in chain.stream({"topic": "nature"}):
         print(chunk, end="", flush=True)
@@ -77,7 +81,9 @@ def demo_schema_inspection():
 
     chain = prompt | model | parser
 
-    # Inspect input and output schemas
+    # Schemas are inferred from the chain's ends: input comes from the prompt's
+    # template variables, output from the last component (str for StrOutputParser).
+    # This is what powers automatic validation and the LangServe API docs.
     input_schema = chain.input_schema.model_json_schema()
     output_schema = chain.output_schema.model_json_schema()
 
@@ -112,7 +118,8 @@ def exercise_first_chain():
 
 
 def new_way():
-    # the univeral way to initialize a model
+    # init_chat_model infers the provider from the model name and returns the right
+    # class, so you can swap providers via config/env without changing imports.
     model = init_chat_model("gpt-4o-mini", temperature=0.7, max_tokens=1500)
 
     # Or provider-specific (still works)
@@ -121,6 +128,8 @@ def new_way():
     from langchain_openai import ChatOpenAI
 
     openai_model = ChatOpenAI(
+        # max_retries adds built-in exponential backoff on rate limits / transient 5xx;
+        # timeout caps a single request so a hung call can't stall the whole chain.
         model="gpt-4o-mini", temperature=0.7, max_tokens=1500, timeout=30, max_retries=3
     )
 

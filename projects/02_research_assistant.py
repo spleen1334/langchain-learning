@@ -32,6 +32,9 @@ class ResearchResponse(BaseModel):
     answer: str = Field(description="The answer to the question")
     confidence: str = Field(description="high, medium, or low based on source quality")
     sources: list[str] = Field(description="List of source documents used")
+    # default=[] is safe HERE only because Pydantic deep-copies defaults per instance —
+    # the same line in a dataclass or a plain function signature would be the classic
+    # shared-mutable-default bug. default_factory=list states the intent more clearly.
     key_quotes: list[str] = Field(
         description="Relevant quotes from sources", default=[]
     )
@@ -49,6 +52,9 @@ class AIResearchAssistant:
     def __init__(
         self,
         persist_directory: str = "./research_db",
+        # 1000/200 = 20% overlap. Larger chunks than the earlier lessons because research
+        # answers need surrounding context; the generous overlap stops a definition that
+        # straddles a boundary from being split away from its explanation.
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
     ):
@@ -63,10 +69,14 @@ class AIResearchAssistant:
         self.splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            # ". " is added to the defaults so that when a paragraph is too big, the next
+            # fallback is a SENTENCE boundary rather than an arbitrary line break.
             separators=["\n\n", "\n", ". ", " ", ""],
         )
 
         # 3. Vector store - stores and searches embeddings
+        # Plain constructor (not .from_documents): this OPENS the collection, creating it
+        # if absent and reloading previously indexed vectors from disk if present.
         self.vectorstore = Chroma(
             persist_directory=persist_directory,
             embedding_function=self.embeddings,
@@ -86,7 +96,8 @@ class AIResearchAssistant:
     ) -> int:
         """Add documents to the research database."""
 
-        # Tag with source name
+        # Tag BEFORE splitting: split_documents copies parent metadata onto every chunk,
+        # so one assignment here propagates to all children.
         if source_name:
             for doc in documents:
                 doc.metadata["source"] = source_name
@@ -94,7 +105,8 @@ class AIResearchAssistant:
         # Split into chunks
         chunks = self.splitter.split_documents(documents)
 
-        # Timestamp each chunk
+        # Indexing timestamp enables later staleness filtering / re-index decisions —
+        # metadata is cheap to add now and impossible to backfill without re-embedding.
         for chunk in chunks:
             chunk.metadata["indexed_at"] = datetime.now(UTC).isoformat()
 
@@ -137,6 +149,9 @@ class AIResearchAssistant:
             search_type="similarity", search_kwargs={"k": 4}
         )
 
+        # Toggle exists because "advanced" is not free: MultiQueryRetriever adds an LLM
+        # call plus N vector searches per question. Worth it for vague research questions,
+        # wasteful for well-phrased ones.
         if not use_advanced:
             return base_retriever
 
@@ -183,6 +198,8 @@ class AIResearchAssistant:
         retriever = self._build_retriever(use_advanced=use_advanced)
         docs = retriever.invoke(question)
         context = self._format_docs_for_context(docs)
+        # Set comprehension de-duplicates: several retrieved chunks usually come from the
+        # same file, and the prompt should list each source once.
         sources = list({d.metadata.get("source", "Unknown") for d in docs})
 
         # Prompt -- tell the LLM about available sources
@@ -203,6 +220,9 @@ class AIResearchAssistant:
 
     Use conversation history to understand follow-up questions.""",
                 ),
+                # History sits BETWEEN the system rules and the freshly retrieved context,
+                # so prior turns can resolve pronouns ("the second component") without
+                # the older context competing with the current retrieval.
                 MessagesPlaceholder(variable_name="history"),
                 (
                     "human",
@@ -232,7 +252,8 @@ class AIResearchAssistant:
             }
         )
 
-        # Save to memory (store just the answer text)
+        # Only response.answer is stored, not the whole ResearchResponse — memory should
+        # carry the conversation, not the retrieved context (which is re-fetched each turn).
         history.add_message(HumanMessage(content=question))
         history.add_message(AIMessage(content=response.answer))
 
@@ -285,6 +306,8 @@ class AIResearchAssistant:
             {
                 "context": context,
                 "question": question,
+                # Sliding window of 5 exchanges — bounds prompt growth (and cost) as the
+                # session gets long. Retrieval, not history, supplies the facts.
                 "history": history.messages[-10:],  # Last 10 messages for context
             }
         )

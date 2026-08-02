@@ -16,6 +16,7 @@ load_dotenv()
 # -- LangSmith Configuration --
 if os.getenv("LANGSMITH_API_KEY"):
     os.environ["LANGSMITH_TRACING"] = "true"
+    # setdefault, so an explicit LANGSMITH_PROJECT in .env still wins.
     os.environ.setdefault("LANGSMITH_PROJECT", "Smart Q&A Bot Project")
     print(f"LangSmith is configured. - Project: {os.getenv('LANGSMITH_PROJECT')}")
 
@@ -25,6 +26,8 @@ class QAResponse(BaseModel):
     answer: str = Field(description="The answer to the user's question.")
     confidence: str = Field(description="Confidence level: high, medium, or low")
     reasoning: str = Field(description="The reasoning behind the answer provided.")
+    # default_factory (not default=[]) is the safe way to default a mutable field —
+    # it builds a fresh list per instance instead of sharing one across all of them.
     follow_up_questions: list[str] = Field(
         description="A list of follow-up questions related to the topic.",
         default_factory=list,
@@ -41,6 +44,8 @@ class SmartQABot:
     def __init__(
         self,
         model_name: str = "gpt-4o-mini",
+        # Low but non-zero: enough variation for natural follow-up suggestions while
+        # keeping factual answers stable.
         temperature: float = 0.3,
     ):
         self.model = ChatOpenAI(
@@ -67,11 +72,16 @@ Always respond with accurate, helpful information.""",
         )
         self.chain = self.prompt | self.model
 
+    # run_type="chain" controls the icon/grouping in the LangSmith trace tree
+    # ("llm", "tool", "retriever" are the other common values).
     @traceable(name="ask_question", run_type="chain")
     def ask(self, question: str) -> QAResponse:
         try:
             response = self.chain.invoke({"question": question})
             return response
+        # Broad catch by design: callers are typed to always receive a QAResponse, so an
+        # API outage or a schema-validation failure becomes a low-confidence answer
+        # rather than an exception leaking into the UI.
         except Exception as e:
             # return a greaceful error response
             return QAResponse(
@@ -86,6 +96,8 @@ Always respond with accurate, helpful information.""",
     def ask_batch(self, questions: list[str]) -> list[QAResponse]:
         """Ask multiple questions in parallel."""
         inputs = [{"question": q} for q in questions]
+        # Note this bypasses ask()'s error handling: .batch() raises if any item fails.
+        # Use .batch(..., return_exceptions=True) to get per-item failures instead.
         return self.chain.batch(inputs)
 
 

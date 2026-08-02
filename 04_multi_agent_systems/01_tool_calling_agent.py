@@ -21,10 +21,15 @@ llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
 
 @tool
 def calculate(expression: str) -> str:
+    # The @tool decorator turns this into a schema for the model: the function NAME,
+    # the type hints, and THIS DOCSTRING are all sent to the LLM as the tool spec.
+    # The docstring is therefore prompt engineering, not just documentation.
     """Calculate a mathematical expression. Example: calculate('2 + 2')"""
     try:
         result = eval(expression)  # Note: In production, use a safe math parser
         return f"The result of {expression} is {result}"
+    # Errors are RETURNED as a string, not raised: the text becomes a ToolMessage the
+    # model can read and react to (retry, apologise). A raised exception would kill the graph.
     except Exception as e:
         return f"Error calculating: {e}"
 
@@ -68,6 +73,8 @@ def create_tool_agent():
     """Create a basic tool-calling agent."""
 
     tools = [calculate, get_weather, search_web]
+    # bind_tools attaches the tool schemas to every request. The model never EXECUTES
+    # anything — it only emits a `tool_calls` list on the AIMessage; ToolNode runs them.
     llm_with_tools = llm.bind_tools(tools)  # this is the secret!
 
     def agent_node(state: AgentState) -> str:
@@ -79,12 +86,15 @@ def create_tool_agent():
         """Check if we should continue to tools or end."""
         last_message = state["messages"][-1]
 
-        # If no tool calls, we're done
+        # The ONLY termination signal in an agent loop: an AIMessage with no tool_calls
+        # means the model produced a final answer instead of requesting another tool.
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
             return "end"
         return "tools"
 
-    # create tool node
+    # Prebuilt node that reads tool_calls off the last AIMessage, runs the matching
+    # functions (in parallel if there are several), and appends one ToolMessage per call
+    # with the matching tool_call_id — providers reject tool results without that id.
     tool_node = ToolNode(tools)
 
     # create graph
@@ -99,6 +109,9 @@ def create_tool_agent():
         "agent", should_continue, {"tools": "tools", "end": END}
     )
 
+    # agent -> tools -> agent is the ReAct loop: the model sees the tool results and
+    # decides whether to call more tools or answer. Unconditional edge, because after
+    # running tools the model must ALWAYS get a chance to interpret them.
     graph.add_edge("tools", "agent")  # loop back after tool execution
 
     return graph.compile()
@@ -125,6 +138,8 @@ def demo_tool_agent():
         # Get final response
         final_message = result["messages"][-1]
         print(f"Response: {final_message.content}")
+        # Message count reveals the loop: 1 human + 1 AI tool request + N tool results
+        # + 1 final AI answer. The third query needs two tools, hence more messages.
         print(f"Total messages: {len(result['messages'])}")
         print("-" * 40)
 
@@ -167,6 +182,8 @@ def demo_tool_execution_trace():
 @tool
 def divide(a: float, b: float) -> str:
     """Divide two numbers."""
+    # Guarding inside the tool keeps the failure inside the conversation: the model gets
+    # this string back and can explain it, rather than the graph raising ZeroDivisionError.
     if b == 0:
         return "Error: Division by zero"
     result = a / b

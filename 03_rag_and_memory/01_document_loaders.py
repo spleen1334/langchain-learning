@@ -29,6 +29,8 @@ def load_text_file():
 
         print(f"Loaded {len(documents)} document(s)")
         print(f"Content preview: {documents[0].page_content[:100]}...")
+        # Every loader stamps a "source" key here; it's what lets a RAG answer cite
+        # which file a retrieved chunk came from, so never strip metadata downstream.
         print(f"Metadata: {documents[0].metadata}")
 
         # Print the loaded documents
@@ -65,6 +67,8 @@ def lazy_loader():
         loader = DirectoryLoader(tmpdir, glob="*.txt", loader_cls=TextLoader)
 
         print("Initialized lazy loader for directory:", tmpdir)
+        # lazy_load() yields documents one at a time instead of building the whole list
+        # like .load() — the difference matters when a directory won't fit in memory.
         for doc in loader.lazy_load():
             print("Document Content Preview:", doc.page_content[:50], "...")
             print("Metadata:", doc.metadata["source"])
@@ -90,6 +94,8 @@ def doc_structure():
 
 def pdf_loader(pdf_path: str):
     loader = PyPDFLoader(pdf_path)
+    # PyPDFLoader returns ONE Document per page (with a "page" in metadata), not one
+    # per file — so len(documents) is the page count, and chunking still happens after.
     documents = loader.load()
 
     print(f"Loaded {len(documents)} document(s) from PDF")

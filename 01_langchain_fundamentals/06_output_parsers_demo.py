@@ -17,12 +17,15 @@ chain = prompt | llm | parser
 
 response = chain.invoke({"topic": "nature"})
 
+# <class 'str'> — without StrOutputParser this would be an AIMessage.
 print(type(response))
 
 
 # JsonOutputParser example
 from langchain_core.output_parsers import JsonOutputParser
 
+# Parses the text into a plain dict. It strips ```json fences, but it does NOT
+# validate the shape — missing/extra keys pass through silently.
 parser = JsonOutputParser()
 
 prompt = ChatPromptTemplate.from_template(
@@ -49,6 +52,9 @@ parser = PydanticOutputParser(pydantic_object=Person)
 
 prompt = ChatPromptTemplate.from_template(
     "Return a JSON object with 'name', 'age', and 'occupation' for: {description}"
+    # get_format_instructions() renders the Pydantic JSON schema as prompt text.
+    # NOTE: this template has no {format_instructions} placeholder, so the partial is
+    # inert here — it only takes effect if the placeholder is present in the template.
 ).partial(format_instructions=parser.get_format_instructions())
 chain = prompt | llm | parser
 result = chain.invoke({"description": "A 30-year-old artist named Maria"})
@@ -62,7 +68,9 @@ class MovieReview(BaseModel):
     rating: int = Field(description="The rating of the movie out of 10")
 
 
-# Bind the schema to the model
+# Preferred over PydanticOutputParser: the schema is sent to the provider as a
+# tool/JSON-schema constraint, so the model is forced to emit valid fields rather
+# than being asked nicely in the prompt and parsed afterwards. No format instructions needed.
 structured_model = llm.with_structured_output(MovieReview)
 
 result = structured_model.invoke("Review: Inception is a mind-bending thriller. 9/10")

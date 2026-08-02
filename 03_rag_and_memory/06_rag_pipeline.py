@@ -99,11 +99,14 @@ Make sure to answer in a concise manner,
 and if you don't know the answer, just say "I don't know."""
     )
 
-    # Format retrieved docs
+    # The retriever hands back Document objects, but the prompt needs a plain string —
+    # this flattening step is required in every RAG chain.
     def format_docs(docs):
         return "\n\n".join([doc.page_content for doc in docs])
 
-    # Rag chain
+    # A bare dict in an LCEL pipe is auto-coerced to RunnableParallel: the question
+    # string is fed to BOTH branches at once. `retriever | format_docs` retrieves and
+    # flattens; RunnablePassthrough forwards the raw question so the prompt gets both.
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
@@ -121,6 +124,8 @@ and if you don't know the answer, just say "I don't know."""
 
     print("Basic RAG Demo:\n")
     for q in questions:
+        # Invoked with a bare string (not a dict) because RunnablePassthrough and the
+        # retriever both accept the raw query as their input.
         answer = rag_chain.invoke(q)
         print(f"Q: {q}")
         print(f"A: {answer}\n")
@@ -143,6 +148,8 @@ Question: {question}
 Answer (include sources):"""
     )
 
+    # Numbering the chunks and inlining each source into the context text is what makes
+    # citation possible — the model can only cite metadata it can actually see.
     def format_docs_with_sources(docs):
         formatted = []
         for i, doc in enumerate(docs):
@@ -171,6 +178,9 @@ def demo_rag_with_fallback():
     vectorstore = create_kb()
     retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 
+    # "ONLY on the context" + an explicit escape hatch is the standard anti-hallucination
+    # guard: retrieval ALWAYS returns k chunks, even for irrelevant questions, so the
+    # prompt (not the retriever) is what stops the model inventing an answer.
     prompt = ChatPromptTemplate.from_template(
         """
 Answer the question based ONLY on the following context.
@@ -218,6 +228,8 @@ def demo_structured_rag():
         """Structured RAG response."""
 
         answer: str = Field(description="The answer to the question")
+        # Self-reported confidence — useful for routing/UX, but it is the model's own
+        # guess, not a calibrated probability or the retrieval similarity score.
         confidence: str = Field(description="high, medium, or low")
         sources_used: list[str] = Field(description="List of sources referenced")
         follow_up: str = Field(description="Suggested follow-up question")
@@ -245,6 +257,7 @@ Provide a structured response."""
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
+        # No StrOutputParser: with_structured_output already yields a RAGResponse object.
         | structured_llm
     )
     print("Structured RAG Demo:\n")
@@ -296,6 +309,8 @@ Format: [Confidence: X] Answer"""
             def format_docs(docs):
                 return "\n".join(d.page_content for d in docs)
 
+            # Built once in __init__ so the vector store and chain are reused across
+            # every ask() — re-indexing per question would be the classic mistake here.
             self.chain = (
                 {
                     "context": self.retriever | format_docs,

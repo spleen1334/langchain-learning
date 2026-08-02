@@ -95,7 +95,9 @@ def demo_interrupt_for_approval():
     graph.add_edge("approval", "finalize")
     graph.add_edge("finalize", END)
 
-    # Compile with checkpointer and interrupt
+    # interrupt_before REQUIRES a checkpointer: pausing means persisting the state and
+    # returning from invoke(), so there must be somewhere to store the frozen snapshot.
+    # The process is not blocked — invoke() returns normally with the partial state.
     memory = MemorySaver()
     app = graph.compile(
         checkpointer=memory, interrupt_before=["approval"]  # Pause before this node
@@ -154,7 +156,9 @@ def demo_interrupt_for_approval():
     print(f'   Human feedback: "{feedback_text}"')
     print("\n   Calling app.update_state() to inject human input...")
 
-    # Update state with human input
+    # update_state writes a partial dict into the paused checkpoint (applying the same
+    # reducers a node would) and creates a new checkpoint — this is the supported way
+    # to inject human decisions between steps.
     app.update_state(
         config, {"approved": False, "feedback": feedback_text}  # Request changes
     )
@@ -163,7 +167,8 @@ def demo_interrupt_for_approval():
     print("\n   Calling app.invoke(None, config) to RESUME...")
     print("   (None means 'no new input, just continue from checkpoint')\n")
 
-    # Continue execution
+    # invoke(None, config) resumes from the checkpoint. Passing a real input dict here
+    # would instead start a new step with that input merged in — not what you want.
     final_result = app.invoke(None, config)
 
     # ─── RESULT ───
@@ -227,6 +232,9 @@ def demo_iterative_review():
             "status": "revised",
         }
 
+    # Routes purely on a status field that only a HUMAN ever sets to "approved" (via
+    # update_state), so the revise loop can never terminate itself — the exit condition
+    # is external input, not model judgement.
     def route_after_review(state: ReviewState) -> Literal["apply", "done"]:
         step_print("🔀", "ROUTER", f"Checking status: '{state['status']}'")
         if state["status"] == "approved":
@@ -255,6 +263,8 @@ def demo_iterative_review():
     graph.add_edge("done", END)
 
     memory = MemorySaver()
+    # Interrupting before a node that sits INSIDE the cycle means the pause fires on
+    # every iteration — one human review per revision round.
     app = graph.compile(checkpointer=memory, interrupt_before=["submit"])
 
     print("\n" + "=" * 55)
@@ -301,6 +311,8 @@ def demo_iterative_review():
     print("   Reviewer sets status: 'needs_revision'")
     print("\n   Calling app.update_state() to inject review...")
 
+    # review_comments has no reducer, so each update REPLACES the list rather than
+    # appending — apply_feedback's [-1] therefore always sees the newest comment.
     app.update_state(
         config, {"review_comments": [feedback_1], "status": "needs_revision"}
     )

@@ -51,6 +51,8 @@ def demo_message_types():
     messages = [
         SystemMessage(content="You are a math tutor. Be brief."),
         HumanMessage(content="What's 5 * 5?"),
+        # Hand-written AIMessage: you can fabricate the model's "previous" answer to
+        # steer it, the API can't tell it didn't actually generate this turn.
         AIMessage(content="25"),
         HumanMessage(content="And if I add 10?"),
     ]
@@ -65,6 +67,9 @@ def demo_messages_placeholder():
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "You are a helpful assistant."),
+            # Reserves a slot for a *list* of Message objects rather than a string.
+            # Injected verbatim at format time, so the model sees real prior turns
+            # with their roles intact — this is how chat memory is wired into a prompt.
             MessagesPlaceholder(variable_name="history"),
             ("human", "{question}"),
         ]
@@ -108,7 +113,9 @@ def demo_few_shot():
         ]
     )
 
-    # Few-shot wrapper
+    # {word} appears both in the examples and in the final human message, but the
+    # few-shot examples are already fully substituted from `examples`, so only the
+    # trailing "{word}" stays an open variable at invoke time.
     few_shot = FewShotChatMessagePromptTemplate(
         example_prompt=example_prompt,
         examples=examples,
@@ -142,7 +149,8 @@ def demo_prompt_composition():
     # Reusable task prompt
     task = ChatPromptTemplate.from_messages([("human", "{task}")])
 
-    # Combine
+    # Concatenating templates merges their message lists AND their input variables,
+    # so one chain can be re-pointed at a new persona purely through invoke() args.
     full_prompt = persona + task
 
     # Test different combinations

@@ -30,6 +30,9 @@ class JSONFormatter(logging.Formatter):
             "function": record.funcName,
         }
 
+        # logger.info(..., extra={"extra_data": {...}}) attaches arbitrary fields to the
+        # LogRecord; merging them into the JSON is what makes logs queryable per-field
+        # in an aggregator instead of requiring regex over a message string.
         if hasattr(record, "extra_data"):
             log_obj.update(record.extra_data)
 
@@ -59,6 +62,8 @@ class MetricsCollector:
         self.metrics = {
             "requests_total": 0,
             "errors_total": 0,
+            # Running sum + count instead of a list of samples: O(1) memory, and enough
+            # for a mean. (Percentiles like p99 would require keeping the samples.)
             "latency_sum": 0,
             "latency_count": 0,
             "tokens_input": 0,
@@ -137,7 +142,8 @@ class InstrumentedLLM:
             response = self.llm.invoke(query)
             result = response.content
 
-            # Estimate tokens
+            # ~1.33 tokens per word heuristic. Good enough for dashboards, but for
+            # billing use response.usage_metadata, which carries the provider's real counts.
             input_tokens = len(query.split()) * 4 // 3
             output_tokens = len(result.split()) * 4 // 3
 
@@ -175,6 +181,8 @@ class InstrumentedLLM:
                 f"LLM request failed: {e}", extra={"extra_data": {"error": str(e)}}
             )
 
+            # Record + log, then re-raise: monitoring must observe failures without
+            # swallowing them, otherwise callers can't distinguish success from error.
             raise
 
 

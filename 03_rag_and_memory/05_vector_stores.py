@@ -50,6 +50,8 @@ SAMPLE_DOCS = [
 def chroma_basics():
     with tempfile.TemporaryDirectory() as tmpdir:
         # create vector store from documents
+        # from_documents embeds every document (one API call batch) AND indexes them.
+        # persist_directory into a temp dir keeps this demo self-cleaning.
         vectorstore = Chroma.from_documents(
             documents=SAMPLE_DOCS, embedding=embeddings_model, persist_directory=tmpdir
         )
@@ -59,6 +61,8 @@ def chroma_basics():
 
         # perform similarity search
         query = "What is LangChain?"
+        # k = how many nearest neighbours to return. Search is semantic, not keyword:
+        # the query is embedded with the SAME model and compared by vector distance.
         results = vectorstore.similarity_search(query, k=2)
 
         print(f"Top 2 results for query '{query}':")
@@ -81,6 +85,9 @@ def similarity_search_with_scores():
 
         print(f"Top 3 results with scores for query '{query}':")
         for i, (doc, score) in enumerate(results_with_scores):
+            # Chroma returns a DISTANCE (lower = better), not a similarity, so the raw
+            # number is inverted here to a 0-1 score where higher = more relevant.
+            # The scale is store-specific — don't hardcode thresholds across backends.
             final_score = 1 / (1 + score)  # Convert distance to similarity
             print(
                 f"Result {i+1}: {doc.page_content} (Score: {final_score:.4f}, Source: {doc.metadata['source']})"
@@ -105,6 +112,9 @@ def metadata_filtering():
             )
 
         # with metadata filtering
+        # Metadata filter is applied as a hard pre-filter on the index, so k is drawn
+        # only from matching docs. Cheaper and more precise than filtering afterwards,
+        # which could return fewer than k results.
         filter_criteria = {"topic": "database"}
         filtered_results = vectorstore.similarity_search(
             query, k=5, filter=filter_criteria
@@ -126,6 +136,8 @@ def as_retriever():
         )
 
         # basic retriever usage
+        # as_retriever wraps the store in a Runnable so it can be piped into an LCEL
+        # chain; .invoke(str) -> list[Document] is the interface RAG chains expect.
         retriever = vectorstore.as_retriever(
             search_type="similarity", search_kwargs={"k": 3}
         )
@@ -138,6 +150,9 @@ def as_retriever():
                 f"Result {i+1}: {doc.page_content} (Source: {doc.metadata['source']})"
             )
 
+        # MMR (Maximal Marginal Relevance) pulls fetch_k candidates, then greedily picks
+        # k that are relevant to the query but DISSIMILAR to each other. Use it when
+        # plain similarity returns near-duplicate chunks that waste context window.
         mmr_retriever = vectorstore.as_retriever(
             search_type="mmr",
             search_kwargs={"k": 3, "fetch_k": 5},  # fetch 5 docs and return 3 diverse
@@ -166,6 +181,9 @@ def persist_chroma():
     # simulate restart - load from disk
     del vectorstore
 
+    # Reopening an existing store uses the plain constructor (NOT from_documents, which
+    # would re-embed and duplicate everything) and takes `embedding_function`. The model
+    # must match the one used at index time or queries land in the wrong vector space.
     reloaded = Chroma(
         embedding_function=embeddings_model,
         persist_directory=persist_dir,
@@ -204,7 +222,7 @@ def exercise_vector_store_setup():
         )
         split_docs = splitter.split_documents(docs)
 
-        # Create vector store (in-memory for exercise)
+        # No persist_directory => ephemeral in-memory collection, discarded on exit.
         vectorstore = Chroma.from_documents(
             documents=split_docs, embedding=embeddings_model
         )

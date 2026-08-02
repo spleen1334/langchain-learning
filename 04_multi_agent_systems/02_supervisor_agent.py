@@ -32,9 +32,14 @@ def create_supervisor_system():
 
     # Define the routing schema
     class RouteDecision(BaseModel):
+        # Literal becomes an ENUM in the JSON schema sent to the provider, so the model
+        # is constrained to these exact values. This is what makes routing safe: free-text
+        # routing could return "the writer" and blow up the conditional-edge lookup.
         next: Literal["researcher", "writer", "critic", "FINISH"] = Field(
             description="The next agent to call, or FINISH if task is complete"
         )
+        # Forcing an explicit rationale improves the routing decision itself (the model
+        # must justify it) and gives you a readable trace.
         reasoning: str = Field(description="Why this agent was chosen")
 
     supervisor_llm = llm.with_structured_output(RouteDecision)
@@ -52,16 +57,23 @@ def create_supervisor_system():
 
         Current conversation shows the progress so far."""
 
+        # The supervisor routes off the FULL shared message history — that transcript is
+        # its only view of what the specialists have already produced.
         messages = [SystemMessage(content=system_prompt)] + state["messages"]
 
         decision = supervisor_llm.invoke(messages)
 
+        # On FINISH, deliberately no message is appended — nothing to add to the
+        # transcript, and task_complete is what the router below actually checks.
         if decision.next == "FINISH":
             return {"next_agent": "FINISH", "task_complete": True}
 
         return {
             "next_agent": decision.next,
             "messages": [
+                # The "[Supervisor]"/"[Writer]"/... prefixes are how agents identify each
+                # other's contributions in a single shared message list — LangGraph has no
+                # per-agent channel here, so the tag IS the sender identity.
                 AIMessage(
                     content=f"[Supervisor] Routing to {decision.next}: {decision.reasoning}"
                 )
@@ -83,7 +95,8 @@ def create_supervisor_system():
             ]
         )
 
-        # Get task from first human message
+        # Pull the ORIGINAL user request rather than the last message, so the researcher
+        # works from the real task instead of the supervisor's routing chatter.
         task = next(
             (m.content for m in state["messages"] if isinstance(m, HumanMessage)), ""
         )
@@ -103,6 +116,8 @@ def create_supervisor_system():
             ]
         )
 
+        # Sliding window of the last few messages: keeps the specialist's prompt bounded
+        # as the shared transcript grows (the critic below uses an even tighter window).
         context = "\n".join([m.content for m in state["messages"][-5:]])
         response = llm.invoke(prompt.format_messages(context=context))
 
@@ -125,7 +140,8 @@ def create_supervisor_system():
         return {"messages": [AIMessage(content=f"[Critic] {response.content}")]}
 
     def finalize(state: SupervisorState) -> dict:
-        # Get the last substantial response
+        # Scans BACKWARDS for the newest [Writer] output — the deliverable is the writer's
+        # latest draft, not the critic's feedback or the supervisor's routing note.
         for msg in reversed(state["messages"]):
             if isinstance(msg, AIMessage) and "[Writer]" in msg.content:
                 content = msg.content.replace("[Writer] ", "")
@@ -133,7 +149,8 @@ def create_supervisor_system():
 
         return {"final_response": "Task completed."}
 
-    # Route based on supervisor decision
+    # Returns the agent NAME straight from state; since the Literal above guarantees the
+    # value is one of the mapped keys, no validation/fallback is needed here.
     def route_to_agent(state: SupervisorState) -> str:
         if state.get("task_complete"):
             return "finalize"
@@ -159,7 +176,10 @@ def create_supervisor_system():
         },
     )
 
-    # After each specialist, go back to supervisor
+    # Star topology: specialists never call each other, they always return to the
+    # supervisor, which re-decides. That's what distinguishes supervisor architecture
+    # from a fixed pipeline — and it's why the graph can loop indefinitely if the
+    # supervisor never says FINISH (LangGraph's recursion limit is the only backstop).
     graph.add_edge("researcher", "supervisor")
     graph.add_edge("writer", "supervisor")
     graph.add_edge("critic", "supervisor")

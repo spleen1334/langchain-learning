@@ -30,6 +30,9 @@ class HandoffDecision(BaseModel):
         description="Which agent to hand off to"
     )
     reason: str = Field(description="Reason for handoff")
+    # The heart of a handoff: the triage agent writes a distilled briefing that the
+    # receiving agent gets in its system prompt. Without it the specialist would have to
+    # re-derive the situation from raw history — the "warm transfer" vs "cold transfer".
     context: str = Field(description="Key context to pass to next agent")
 
 
@@ -52,6 +55,8 @@ def create_customer_service_system():
         messages = [SystemMessage(content=system)] + state["messages"]
         decision = handoff_llm.invoke(messages)
 
+        # "end" = triage handles it itself. Avoids a pointless specialist hop (and its
+        # extra LLM call) for trivial questions.
         if decision.handoff_to == "end":
             # Answer directly
             response = llm.invoke(
@@ -80,6 +85,8 @@ def create_customer_service_system():
 
     def sales_agent(state: HandoffState) -> dict:
         """Sales specialist."""
+        # Context is injected into the SYSTEM prompt (not as a user turn) so the
+        # specialist treats it as briefing material rather than customer input.
         system = f"""You are a sales specialist. Context from triage: {state.get('context_summary', 'None')}
 
             Help the customer with product questions and purchases.
@@ -89,6 +96,8 @@ def create_customer_service_system():
 
         return {
             "messages": [AIMessage(content=f"[Sales] {response.content}")],
+            # "..._complete" marks the conversation as handled; each specialist edges
+            # straight to END, so this is a status marker for callers, not a route key.
             "current_agent": "sales_complete",
         }
 
@@ -120,6 +129,8 @@ def create_customer_service_system():
             "current_agent": "billing_complete",
         }
 
+    # Whitelist rather than a direct passthrough: anything unexpected (including the
+    # schema's unused "stay" value) falls through to "end" instead of a missing-node error.
     def route_from_triage(state: HandoffState) -> str:
         agent = state["current_agent"]
         if agent in ["sales", "support", "billing"]:
@@ -140,6 +151,7 @@ def create_customer_service_system():
         {"sales": "sales", "support": "support", "billing": "billing", "end": END},
     )
 
+    # One-way handoff: unlike the supervisor pattern, control never returns to triage.
     graph.add_edge("sales", END)
     graph.add_edge("support", END)
     graph.add_edge("billing", END)

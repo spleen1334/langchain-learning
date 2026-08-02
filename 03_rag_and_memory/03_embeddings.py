@@ -8,6 +8,10 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 
 load_dotenv()
 
+# Runs locally (no API cost, no data leaves the machine). Fewer dimensions = smaller
+# index and faster search, at some accuracy cost vs the OpenAI models above.
+# Dimensions are NOT interchangeable: switching embedding models means re-indexing
+# everything, since old vectors can't be compared against new ones.
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2") # 384 dimensions
 
 

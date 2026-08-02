@@ -87,23 +87,32 @@ def recursive_splitter():
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
         chunk_overlap=50,
+        # Tried IN ORDER: split on paragraphs first, fall back to lines, then words,
+        # and only chop mid-word ("") as a last resort. This ordering is what makes it
+        # "recursive" and is why it preserves semantic boundaries better than a fixed cut.
         separators=["\n\n", "\n", " ", ""],
     )
     chunks = splitter.split_text(SAMPLE_TEXT)
 
     print(f"Original length: {len(SAMPLE_TEXT)} chars")
     print(f"Number of chunks: {len(chunks)}")
+    # chunk_size is an upper bound, not a target: chunks end at the nearest separator,
+    # so sizes vary and are usually well under 500.
     print(f"Chunk sizes: {[len(c) for c in chunks]}")
     print(f"\nFirst chunk preview:\n{chunks[0][:200]}...")
 
 
 def chunk_size_comparison():
+    # The core RAG trade-off: small chunks give precise retrieval but lose context,
+    # large chunks carry context but dilute the embedding and waste prompt tokens.
     sizes = [200, 500, 1000]
 
     print("=== Chunk Size Comparison ===")
     for size in sizes:
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=size, chunk_overlap=size // 5
+            # ~10-20% of chunk_size is the usual rule of thumb: enough to keep a sentence
+            # that straddles a boundary intact, without duplicating too much stored text.
         )  # 20% overlap
         chunks = splitter.split_text(SAMPLE_TEXT)
         print(f" Size {size}: {len(chunks)} chunks")
@@ -112,6 +121,8 @@ def chunk_size_comparison():
 def overlap_importance():
     text = "The quick brown fox jumps over the lazy dog. " * 10  # Repeated text
 
+    # Overlap repeats the tail of one chunk at the head of the next, so a fact split
+    # across a boundary still appears whole in at least one retrievable chunk.
     # without overlap
     no_overlap = RecursiveCharacterTextSplitter(chunk_size=50, chunk_overlap=0)
 
@@ -136,6 +147,9 @@ def markdown_splitter():
         ("##", "h2"),
         ("###", "h3"),
     ]
+    # Splits on document STRUCTURE rather than length, and lifts each heading into the
+    # chunk's metadata — so a retrieved chunk still knows which section it belongs to.
+    # It ignores chunk_size entirely, so it's usually chained into a character splitter.
     splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_consider)
     chunks = splitter.split_text(SAMPLE_TEXT)
 
@@ -147,6 +161,8 @@ def markdown_splitter():
 
 
 def code_splitter():
+    # from_language swaps in language-aware separators ("\nclass ", "\ndef ", ...) so
+    # chunks break between functions instead of mid-body.
     python_splitter = RecursiveCharacterTextSplitter.from_language(
         language=Language.PYTHON, chunk_size=500, chunk_overlap=50
     )
@@ -167,7 +183,8 @@ def document_splitter():
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 
-    # split the docs
+    # split_documents (vs split_text) keeps Document objects and COPIES each parent's
+    # metadata onto every child chunk — that's how page/source survives into the index.
     split_docs = splitter.split_documents(docs)
 
     print(f"Split into {len(split_docs)} chunks")

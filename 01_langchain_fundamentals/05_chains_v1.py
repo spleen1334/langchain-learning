@@ -51,7 +51,8 @@ def demo_parallel_chain():
 
     parser = StrOutputParser()
 
-    # Parallel execution
+    # RunnableParallel fans the SAME input dict out to every branch concurrently and
+    # returns a dict keyed by branch name. Wall time ~= the slowest branch, not the sum.
     analysis_chain = RunnableParallel(
         summary=summarize_prompt | model | parser,
         keywords=keywords_prompt | model | parser,
@@ -85,6 +86,10 @@ def demo_passthrough_chain():
     def fake_retriever(input_dict):
         return " LangChain was created by Harrison Chase in 2022."
 
+    # This is the canonical RAG shape: retrieve context while forwarding the original
+    # question unchanged. RunnablePassthrough copies the input through untouched, which
+    # is why x["question"] here is the whole input DICT and needs the extra ["question"]
+    # unwrapping in the next step before it matches the prompt's variables.
     chain = (
         RunnableParallel(
             context=RunnableLambda(fake_retriever), question=RunnablePassthrough()
@@ -118,11 +123,14 @@ def demo_chain_branching():
     )
     classifer = classifier_prompt | model | StrOutputParser()
 
-    # Branching chain  based on classification
+    # Note the cost: the condition itself makes an extra LLM call, so every branched
+    # request is two round-trips. Substring match keeps it tolerant of "Code."/"code".
     def is_code_question(input_dict):
         classification = classifer.invoke(input_dict)
         return "code" in classification.lower()
 
+    # RunnableBranch takes (condition, runnable) pairs, evaluated top-down; the final
+    # bare runnable is the mandatory fallback when no condition matches.
     branch = RunnableBranch(
         (is_code_question, code_prompt | model | StrOutputParser()),
         general_prompt | model | StrOutputParser(),  # default branch
@@ -147,6 +155,8 @@ def demo_debbuging():
     print("Chain input schema:", chain.input_schema.model_json_schema())
     print("Chain output schema:", chain.output_schema.model_json_schema())
 
+    # with_config returns a *copy* of the chain with the config attached (it does not
+    # mutate `chain`). run_name/tags are what you'll search on in the LangSmith UI.
     # Method 2: Use with_config for tacing
     result = chain.with_config(
         run_name="greeting_chain",
@@ -156,6 +166,7 @@ def demo_debbuging():
 
     # Method 3: Inspect intermediate steps
     # Using RunnableLambda for logging
+    # Returns x unchanged so it can be spliced anywhere in the pipe as a no-op probe.
     def log_step(x, step_name=""):
         print(f"[{step_name}] {type(x).__name__}: {str(x)[:100]}")
         return x

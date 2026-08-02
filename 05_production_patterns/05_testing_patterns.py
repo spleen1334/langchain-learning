@@ -19,6 +19,8 @@ load_dotenv()
 class QAChain:
     """Simple Q&A chain for testing."""
 
+    # Dependency injection: accepting an llm makes the chain testable. Constructing the
+    # model inside with no way to override it would force every test to hit the API.
     def __init__(self, llm=None):
         self.llm = llm or ChatOpenAI(model="gpt-4o-mini", temperature=0)
         self.prompt = ChatPromptTemplate.from_template(
@@ -36,12 +38,16 @@ def test_qa_chain_with_mock():
 
     # Create mock LLM
     mock_llm = Mock()
+    # The mock must return an AIMessage, not a str — the code under test reads .content,
+    # so the fake has to match the real interface's shape.
     mock_llm.invoke.return_value = AIMessage(content="Paris")
 
     # Test with mock
     chain = QAChain(llm=mock_llm)
     result = chain.ask("What is the capital of France?")
 
+    # Deterministic and free: this tests YOUR wiring (prompt -> llm -> .content),
+    # deliberately not the model's answer quality — that's what evaluation below is for.
     assert result == "Paris"
     mock_llm.invoke.assert_called_once()
 
@@ -85,6 +91,8 @@ class IntegrationTestSuite:
             response = self.llm.invoke(case["question"])
             content = response.content.lower()
 
+            # Substring match against SEVERAL acceptable forms, not equality: LLM output
+            # is non-deterministic phrasing, so exact assertions would be flaky.
             passed = any(exp.lower() in content for exp in case["expected_contains"])
 
             # "The answer is 4" or "2 + 2 equals four" or "That would be 4."
@@ -125,6 +133,8 @@ def demo_integration_tests():
 class LLMEvaluator:
     """Use LLM to evaluate LLM outputs."""
 
+    # temperature=0 on the JUDGE is essential: an evaluator that scores differently on
+    # reruns makes regressions indistinguishable from noise.
     def __init__(self):
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
@@ -151,6 +161,8 @@ Respond with ONLY a JSON object:
 """
         )
 
+        # Reference is optional, so the section collapses to an empty string when absent —
+        # this is how one prompt covers both reference-based and reference-free grading.
         reference_section = ""
         if reference:
             reference_section = f"Reference answer: {reference}"
@@ -231,6 +243,8 @@ class RegressionTestRunner:
                     "response": response,
                     "expected": case.get("expected"),
                     "scores": scores,
+                    # Pass/fail on a SCORE THRESHOLD rather than exact match — the only
+                    # workable assertion when outputs are free text. Tune 7 to taste.
                     "passed": overall >= 7,  # Threshold
                 }
             )
@@ -360,6 +374,8 @@ def qa_target(inputs: dict) -> dict:
     Target function for LangSmith evaluation.
     Must accept a dict (inputs) and return a dict (outputs).
     """
+    # The dict keys are the contract: `inputs` mirrors the dataset examples' "inputs",
+    # and the returned keys must match what the evaluators read off run.outputs.
     response = qa_chain.invoke({"question": inputs["question"]})
     return {"answer": response.content}
 
@@ -374,6 +390,9 @@ eval_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 def correctness(run, example) -> dict:
     """LLM-as-judge evaluator for correctness against reference answer."""
+    # Evaluator signature is fixed: `run` is what the target produced, `example` is the
+    # dataset row (with the reference). Return {"key", "score"} — key names the metric
+    # column in LangSmith, score should be numeric for cross-experiment comparison.
     prediction = run.outputs.get("answer", "")
     reference = example.outputs.get("answer", "")
     question = example.inputs.get("question", "")
@@ -392,12 +411,17 @@ def correctness(run, example) -> dict:
             question=question, submission=prediction, reference=reference
         )
     )
+    # Binary Y/N is easier for a model to produce reliably than a 1-10 scale, and
+    # averaging the 0/1 scores across the dataset gives a clean pass-rate percentage.
+    # Anything that isn't exactly "Y" counts as a failure (fail closed).
     score = 1.0 if result.content.strip().upper() == "Y" else 0.0
     return {"key": "correctness", "score": score}
 
 
 def helpfulness(run, example) -> dict:
     """LLM-as-judge evaluator for helpfulness (no reference needed)."""
+    # Reference-free evaluator: it judges the response on its own merits, so it works
+    # on datasets where no gold answer exists.
     prediction = run.outputs.get("answer", "")
     question = example.inputs.get("question", "")
 
@@ -424,7 +448,9 @@ def contains_answer(run, example) -> dict:
     prediction = run.outputs.get("answer", "").lower()
     reference = example.outputs.get("answer", "").lower()
 
-    # Extract key words from reference (words > 3 chars)
+    # >3 chars filters out stopwords ("is", "the", "a") that would otherwise match
+    # everything and inflate the score. Deterministic and free — a cheap sanity metric
+    # to run alongside the LLM judges, which cost money and can drift.
     key_words = [word for word in reference.split() if len(word) > 3]
 
     # Check if at least 50% of key words appear in prediction
@@ -452,6 +478,8 @@ def run_evaluation(dataset_name: str):
         data=dataset_name,
         evaluators=[correctness, helpfulness, contains_answer],
         experiment_prefix="qa-chain-v1",  # Tags this run for comparison
+        # Runs examples in parallel; keep it low to stay under provider rate limits,
+        # since each example fires the target plus one call per LLM evaluator.
         max_concurrency=2,
     )
 
@@ -503,6 +531,8 @@ def run_comparison(dataset_name: str):
         qa_target_v2,
         data=dataset_name,
         evaluators=[correctness, helpfulness, contains_answer],
+        # Same dataset + same evaluators, only the prompt changed — that's what makes
+        # v1 vs v2 a controlled comparison rather than an anecdote.
         experiment_prefix="qa-chain-v2",  # Different prefix for comparison
         max_concurrency=2,
     )

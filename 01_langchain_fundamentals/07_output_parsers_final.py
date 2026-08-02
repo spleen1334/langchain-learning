@@ -28,6 +28,7 @@ def demo_str_parser():
 
     chain = prompt | model | parser
 
+    # Empty dict, not None: a template with no variables still expects a mapping input.
     result = chain.invoke({})
     print(f"Result: '{result}' (type: {type(result).__name__})")
 
@@ -62,6 +63,9 @@ def demo_pydantic_parser():
 
     prompt = ChatPromptTemplate.from_template(
         "Create a simple recipe for: {dish}\n\n{format_instructions}"
+        # partial() pre-fills format_instructions once at build time so callers only
+        # pass {dish}. The instructions are the Pydantic JSON schema rendered as text —
+        # with this parser the schema lives in the PROMPT, so compliance is best-effort.
     ).partial(format_instructions=parser.get_format_instructions())
 
     chain = prompt | model | parser
@@ -89,7 +93,10 @@ def demo_structured_output():
         deadline: str | None = Field(description="Deadline if mentioned")
         assignee: str | None = Field(description="Person assigned if mentioned")
 
-    # Bind schema to model
+    # Enforced provider-side via function/tool calling instead of prompt text, so the
+    # chain's output is already a validated TaskExtraction — no parser step in the pipe.
+    # The class docstring and Field descriptions ARE sent to the model as schema docs,
+    # so they double as instructions (hence `deadline`/`assignee` being Optional matters).
     structured_model = model.with_structured_output(TaskExtraction)
 
     # No need for format instructions - it's automatic
@@ -128,6 +135,8 @@ def demo_complex_schema():
         headquarters: Address
         products: list[str]
 
+    # Nested models become nested JSON schema; the provider handles arbitrary depth,
+    # so result.headquarters comes back as a real Address instance, not a dict.
     structured_model = model.with_structured_output(Company)
 
     prompt = ChatPromptTemplate.from_template(
@@ -170,6 +179,8 @@ def exercise_structured_extraction():
         director: str = Field(description="Director name")
         actors: list[str] = Field(description="Main actors")
         genre: str = Field(description="Primary genre")
+        # ge/le are emitted into the JSON schema as min/max AND enforced by Pydantic
+        # on parse, so an out-of-range value raises instead of silently passing through.
         rating: int = Field(description="Rating from 1-10", ge=1, le=10)
 
     structured_model = model.with_structured_output(Movie)

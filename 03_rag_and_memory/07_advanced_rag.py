@@ -192,6 +192,9 @@ def demo_multi_query_retriever():
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
 
     # Create multi-query retriever
+    # Fixes vocabulary mismatch: the LLM rewrites the question into several phrasings,
+    # runs k=2 retrieval for EACH, then unions and de-duplicates by content. Cost is one
+    # extra LLM call plus N searches, in exchange for much better recall.
     retriever = MultiQueryRetriever.from_llm(
         retriever=vectorstore.as_retriever(search_kwargs={"k": 2}), llm=llm
     )
@@ -223,10 +226,13 @@ def demo_contextual_compression():
     vectorstore = create_base_vectorstore()
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
-    # Create compressor
+    # "Compression" = an LLM pass over each retrieved chunk that keeps only the sentences
+    # relevant to the query (it can also drop a chunk entirely). One extra LLM call PER
+    # document, but it removes the noise that dilutes the final answer.
     compressor = LLMChainExtractor.from_llm(llm)
 
     # Wrap retriever with compression
+    # k=4 here vs k=2 below: retrieve wide, then let compression trim — that's the point.
     compression_retriever = ContextualCompressionRetriever(
         base_compressor=compressor,
         base_retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
@@ -262,7 +268,9 @@ def demo_ensemble_hybrid_search():
 
     vectorstore = create_base_vectorstore()
 
-    # BM25 keyword retriever
+    # BM25 is classic lexical/keyword scoring — no embeddings, no API calls. It nails
+    # exact terms (product names, error codes, "ACID") that embeddings often blur away.
+    # It is built from the raw docs, NOT from the vector store.
     bm25_retriever = BM25Retriever.from_documents(TECH_DOCS)
     bm25_retriever.k = 3
 
@@ -270,6 +278,9 @@ def demo_ensemble_hybrid_search():
     semantic_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
     # Ensemble combines both
+    # Merges both result lists with weighted Reciprocal Rank Fusion — it combines RANKS,
+    # not raw scores, which is why two incomparable scoring schemes can be blended.
+    # Weights must align with the retrievers list order.
     ensemble_retriever = EnsembleRetriever(
         retrievers=[bm25_retriever, semantic_retriever],
         weights=[0.4, 0.6],  # 40% keyword, 60% semantic
@@ -346,7 +357,9 @@ LangSmith provides observability for LangChain/LangGraph applications, offering 
         metadata={"source": "ai_agents_guide.md"},
     )
 
-    # Splitters
+    # Resolves the chunk-size dilemma: small chunks embed precisely, large chunks answer
+    # well. Only the 200-char CHILDREN are embedded and searched; the matching 800-char
+    # PARENT is what gets returned to the LLM.
     parent_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     child_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=20)
 
@@ -355,6 +368,8 @@ LangSmith provides observability for LangChain/LangGraph applications, offering 
         collection_name="parent_child_demo",
         embedding_function=OpenAIEmbeddings(model="text-embedding-3-small"),
     )
+    # Two separate stores: the vector store holds child embeddings, this docstore holds
+    # the parent text keyed by id. Both are needed — losing the docstore breaks lookup.
     store = InMemoryStore()
 
     # Create retriever
@@ -365,7 +380,8 @@ LangSmith provides observability for LangChain/LangGraph applications, offering 
         parent_splitter=parent_splitter,
     )
 
-    # Add document
+    # add_documents (not the store's own API) does the two-level split, embeds children,
+    # and writes parents to the docstore with the linking ids.
     retriever.add_documents([long_doc])
 
     # Search
@@ -403,6 +419,9 @@ def demo_advanced_rag_chain():
     )
 
     # Compression to focus on relevant info
+    # Retrievers compose: multi-query widens recall first, then compression narrows the
+    # result down to relevant sentences. Order matters — expand, THEN filter.
+    # Cost warning: this is 1 query-expansion call + N searches + 1 call per retrieved doc.
     compressor = LLMChainExtractor.from_llm(llm)
     advanced_retriever = ContextualCompressionRetriever(
         base_compressor=compressor, base_retriever=multi_retriever

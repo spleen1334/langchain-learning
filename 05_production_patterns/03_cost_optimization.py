@@ -23,6 +23,8 @@ class ModelRouter:
         self.expensive_model = ChatOpenAI(model="gpt-4o", temperature=0)
         self.classifier = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
+    # The classifier runs on the CHEAP model — routing must cost far less than the
+    # expensive call it avoids, or the whole pattern is a net loss.
     def classify_complexity(self, query: str) -> str:
         """Classify query complexity."""
 
@@ -50,6 +52,8 @@ Respond with only: simple or complex
         """
         complexity = self.classify_complexity(query)
 
+        # Exact == means anything unexpected falls through to the EXPENSIVE model.
+        # Deliberately fail-safe on quality rather than on cost.
         if complexity == "simple":
             model = self.cheap_model
             model_name = "gpt-4o-mini"
@@ -61,7 +65,8 @@ Respond with only: simple or complex
 
         response = model.invoke(query)
 
-        # Estimate cost (rough)
+        # Input tokens only — output tokens are typically 3-4x more expensive, so this
+        # figure understates the real cost. Illustrative, not billable.
         tokens = len(query.split()) * 1.3  # Rough token estimate
         estimated_cost = (tokens / 1000) * cost_per_1k
 
@@ -106,6 +111,9 @@ class SemanticCache:
 
     def _hash_query(self, query: str) -> str:
         """Create hash of normalized query."""
+        # Lower+strip is what makes "What is Python?" and "what is python?" share a key.
+        # Note this is EXACT-match caching despite the class name — real semantic caching
+        # would embed the query and match by vector similarity (see notes at file end).
         normalized = query.lower().strip()
         return hashlib.md5(normalized.encode()).hexdigest()
 
@@ -135,6 +143,8 @@ class CachedLLM:
     """LLM wrapper with caching."""
 
     def __init__(self):
+        # temperature=0 matters for caching: a deterministic model makes a replayed
+        # cached answer indistinguishable from a fresh call.
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
         self.cache = SemanticCache()
         self.cache_hits = 0
@@ -243,6 +253,8 @@ class BudgetedLLM:
         # Check budget
         within_budget, tokens = self.budget.check_budget(query)
 
+        # Rejected BEFORE the API call — the whole point is to prevent the spend, not to
+        # report it afterwards.
         if not within_budget:
             raise ValueError(
                 f"Query exceeds token budget: {tokens} > {self.budget.max_per_request}"

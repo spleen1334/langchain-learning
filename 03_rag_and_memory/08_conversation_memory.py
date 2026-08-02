@@ -56,7 +56,9 @@ def demo_basic_memory():
             store[session_id] = InMemoryChatMessageHistory()
         return store[session_id]
 
-    # Wrap with history
+    # Wraps the chain so that on each invoke it: loads history for the session, injects
+    # it into `history`, runs the chain, then appends BOTH the input and the output to
+    # the store automatically. The keys must match the prompt's variable names.
     chain_with_history = RunnableWithMessageHistory(
         chain,
         get_session_history,
@@ -64,7 +66,8 @@ def demo_basic_memory():
         history_messages_key="history",
     )
 
-    # Configuration for this session
+    # session_id is looked up by get_session_history — the LangChain equivalent of
+    # LangGraph's thread_id. Omitting it raises rather than silently sharing memory.
     config = {"configurable": {"session_id": "user_123"}}
 
     # Conversation
@@ -118,7 +121,8 @@ def demo_multi_sessions():
         history_messages_key="history",
     )
 
-    # Simulate two users
+    # ONE chain object serves both users — isolation comes entirely from the session_id
+    # in the config, so a chain can be built once and shared across requests/threads.
     user_a_config = {"configurable": {"session_id": "user_a"}}
     user_b_config = {"configurable": {"session_id": "user_b"}}
 
@@ -186,9 +190,15 @@ def demo_message_trimming():
     trimmed = trim_messages(
         messages,
         max_tokens=60,
+        # "last" keeps the most RECENT messages (drops from the front) — usually what you
+        # want, since recent turns matter most. "first" would do the opposite.
         strategy="last",
+        # Passing the model itself makes it count tokens with that model's real tokenizer
+        # rather than a character-count estimate.
         token_counter=llm,
         include_system=True,  # Always keep system message
+        # False = never cut a message in half; drop it whole. Half a message can leave
+        # dangling tool calls or nonsense context.
         allow_partial=False,
     )
 
@@ -210,12 +220,18 @@ def demo_windowed_memory():
     class WindowedChatHistory(InMemoryChatMessageHistory):
         """Chat history that keeps only last k message pairs."""
 
+        # Declared as a class-level annotated field because the parent is a Pydantic
+        # model — a plain __init__ assignment would be rejected.
         k: int = 3  # Pydantic field - number of exchange pairs to keep
 
+        # Overriding the write path (not the read path) means trimming happens once on
+        # append rather than on every retrieval, and the store never grows unbounded.
         def add_messages(self, messages):
             super().add_messages(messages)
             # Keep only last k pairs (2k messages: human + ai)
             if len(self.messages) > self.k * 2:
+                # Rebinding to a slice (rather than del/pop in place) — the discarded
+                # messages are gone for good; this window forgets, it doesn't archive.
                 self.messages = self.messages[-(self.k * 2) :]
 
     store: dict[str, WindowedChatHistory] = {}
@@ -286,6 +302,8 @@ def demo_summary_memory():
     print("=" * 60)
 
     # --- Setup ---
+    # Two separate models on purpose: temperature=0 for summarization (facts must not
+    # drift as they're re-compressed each round) and 0.7 for the conversational replies.
     summary_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     chat_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
 
@@ -307,6 +325,8 @@ def demo_summary_memory():
     chat_chain = chat_prompt | chat_llm | StrOutputParser()
 
     # The summarization prompt: compress messages into a running summary
+    # Takes the OLD summary plus the newly-evicted messages and folds them together, so
+    # the summary is refined incrementally instead of re-summarizing the whole history.
     summarize_prompt = ChatPromptTemplate.from_template(
         "Condense the current summary and new messages into a single updated summary "
         "(2-3 sentences). Preserve all key facts about the user.\n\n"
@@ -355,6 +375,9 @@ def demo_summary_memory():
         # 3. If recent messages exceed limit, summarize the oldest ones
         if len(recent_messages) > MAX_RECENT:
             # Take the oldest messages that will be summarized away
+            # Everything EXCEPT the last MAX_RECENT — those are the messages about to
+            # fall out of the verbatim buffer, so they must be folded into the summary
+            # BEFORE the buffer is truncated below, or the facts would be lost.
             messages_to_summarize = recent_messages[:-MAX_RECENT]
             formatted = "\n".join(
                 f"{'Human' if isinstance(m, HumanMessage) else 'AI'}: {m.content}"
@@ -416,6 +439,8 @@ def exercise_persistent_memory():
     # Use SQLite for persistence
     db_path = "./chat_history.db"
 
+    # A NEW SQLChatMessageHistory per call is fine (and intended): it holds no state
+    # itself, reading/writing the DB on demand, so nothing lives in process memory.
     def get_session_history(session_id: str) -> BaseChatMessageHistory:
         return SQLChatMessageHistory(
             session_id=session_id, connection=f"sqlite:///{db_path}"
@@ -538,7 +563,8 @@ def exercise_persistent_memory_proof():
         response = chain_v1.invoke({"input": msg}, config=config)
         print(f"AI:   {response}\n")
 
-    # Throw away the chain object entirely -- no in-memory state survives
+    # Dropping the chain proves the point: if any history were cached on the object,
+    # RUN 2 below would fail to recall anything.
     del chain_v1
 
     # =====================================================
