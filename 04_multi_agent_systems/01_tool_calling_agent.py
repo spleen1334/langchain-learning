@@ -3,18 +3,16 @@ Tool-Calling Agents with LangGraph
 Building agents that can use tools
 """
 
-from urllib import response
-from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
-from langchain_openai import ChatOpenAI
-from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, BaseMessage
-from typing_extensions import TypedDict, Annotated
-from langgraph.graph.message import add_messages
-from typing import Literal
-import operator
-import json
+from typing import Annotated, Literal
+
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+from typing_extensions import TypedDict
 
 load_dotenv()
 

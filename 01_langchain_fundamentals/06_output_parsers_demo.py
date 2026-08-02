@@ -1,17 +1,9 @@
+from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import (
     ChatPromptTemplate,
-    FewShotChatMessagePromptTemplate,
-    MessagesPlaceholder,
 )
-from langchain_core.messages import (
-    SystemMessage,
-    HumanMessage,
-    AIMessage,
-)
-from langchain_openai import ChatOpenAI
-from dotenv import load_dotenv
-from langchain_core.output_parsers import StrOutputParser
-from langchain.chat_models import init_chat_model
 
 load_dotenv()
 

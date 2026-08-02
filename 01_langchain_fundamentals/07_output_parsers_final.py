@@ -2,16 +2,16 @@
 Output Parsers and Structured Output in LangChain V.1
 """
 
+
+from dotenv import load_dotenv
 from langchain_core.output_parsers import (
-    StrOutputParser,
     JsonOutputParser,
     PydanticOutputParser,
+    StrOutputParser,
 )
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
-from typing import List, Optional
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -54,7 +54,7 @@ def demo_pydantic_parser():
     # Define schema
     class Recipe(BaseModel):
         name: str = Field(description="Name of the recipe")
-        ingredients: List[str] = Field(description="List of ingredients")
+        ingredients: list[str] = Field(description="List of ingredients")
         prep_time_minutes: int = Field(description="Preparation time in minutes")
         difficulty: str = Field(description="easy, medium, or hard")
 
@@ -86,8 +86,8 @@ def demo_structured_output():
 
         task: str = Field(description="The main task to do")
         priority: str = Field(description="high, medium, or low")
-        deadline: Optional[str] = Field(description="Deadline if mentioned")
-        assignee: Optional[str] = Field(description="Person assigned if mentioned")
+        deadline: str | None = Field(description="Deadline if mentioned")
+        assignee: str | None = Field(description="Person assigned if mentioned")
 
     # Bind schema to model
     structured_model = model.with_structured_output(TaskExtraction)
@@ -126,7 +126,7 @@ def demo_complex_schema():
         industry: str
         employee_count: int
         headquarters: Address
-        products: List[str]
+        products: list[str]
 
     structured_model = model.with_structured_output(Company)
 
@@ -168,7 +168,7 @@ def exercise_structured_extraction():
         title: str = Field(description="Movie title")
         year: int = Field(description="Year released")
         director: str = Field(description="Director name")
-        actors: List[str] = Field(description="Main actors")
+        actors: list[str] = Field(description="Main actors")
         genre: str = Field(description="Primary genre")
         rating: int = Field(description="Rating from 1-10", ge=1, le=10)
 

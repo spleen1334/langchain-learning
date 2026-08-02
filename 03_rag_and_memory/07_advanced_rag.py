@@ -3,22 +3,25 @@ Advanced RAG Patterns
 Multi-query, self-query, compression, hybrid search
 """
 
-from langchain_classic.retrievers.multi_query import MultiQueryRetriever
-from langchain_classic.retrievers import ContextualCompressionRetriever
-from langchain_classic.retrievers.document_compressors import LLMChainExtractor
-from langchain_classic.retrievers import EnsembleRetriever
-from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers import ParentDocumentRetriever
-from langchain_classic.storage import InMemoryStore
-from langchain_chroma import Chroma
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from dotenv import load_dotenv
 import logging
+
+from dotenv import load_dotenv
+from langchain_chroma import Chroma
+from langchain_classic.retrievers import (
+    ContextualCompressionRetriever,
+    EnsembleRetriever,
+    ParentDocumentRetriever,
+)
+from langchain_classic.retrievers.document_compressors import LLMChainExtractor
+from langchain_classic.retrievers.multi_query import MultiQueryRetriever
+from langchain_classic.storage import InMemoryStore
+from langchain_community.retrievers import BM25Retriever
+from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
@@ -235,7 +238,7 @@ def demo_contextual_compression():
 
     # Without compression
     base_docs = vectorstore.as_retriever(search_kwargs={"k": 2}).invoke(query)
-    print(f"\n--- WITHOUT Compression (full chunks) ---")
+    print("\n--- WITHOUT Compression (full chunks) ---")
     for doc in base_docs:
         print(f"Length: {len(doc.page_content)} chars")
         print(f"Content: {doc.page_content[:150]}...\n")
@@ -243,7 +246,7 @@ def demo_contextual_compression():
     # With compression
     # With compression
     compressed_docs = compression_retriever.invoke(query)
-    print(f"\n--- WITH Compression (relevant only) ---")
+    print("\n--- WITH Compression (relevant only) ---")
     for doc in compressed_docs:
         print(f"Length: {len(doc.page_content)} chars")
         print(f"Content: {doc.page_content}\n")
@@ -372,13 +375,13 @@ LangSmith provides observability for LangChain/LangGraph applications, offering 
 
     # Regular retrieval (would get small chunks)
     child_docs = vectorstore.similarity_search(query, k=1)
-    print(f"\n--- Child Chunk (what search found) ---")
+    print("\n--- Child Chunk (what search found) ---")
     print(f"Length: {len(child_docs[0].page_content)} chars")
     print(f"Content: {child_docs[0].page_content}")
 
     # Parent retrieval (gets full context)
     parent_docs = retriever.invoke(query)
-    print(f"\n--- Parent Chunk (what's returned) ---")
+    print("\n--- Parent Chunk (what's returned) ---")
     print(f"Length: {len(parent_docs[0].page_content)} chars")
     print(f"Content preview: {parent_docs[0].page_content[:300]}...")
 

@@ -3,15 +3,12 @@ Text Splitters and Chunking Strategies
 Optimizing document chunks for RAG
 """
 
-from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,
-    CharacterTextSplitter,
-    TokenTextSplitter,
-    MarkdownHeaderTextSplitter,
-    Language,
-)
-from langchain_core.documents import Document
 from dotenv import load_dotenv
+from langchain_text_splitters import (
+    Language,
+    MarkdownHeaderTextSplitter,
+    RecursiveCharacterTextSplitter,
+)
 
 load_dotenv()
 
@@ -162,7 +159,6 @@ def code_splitter():
 
 def document_splitter():
     from langchain_community.document_loaders import PyPDFLoader
-    from langchain_core.documents import Document
 
     loader = PyPDFLoader("./assets/sample_docs/langchain_demo.pdf")
     docs = loader.load()

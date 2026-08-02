@@ -3,17 +3,14 @@ Monitoring and Logging for Production
 Structured logging, metrics, and alerts
 """
 
-import logging
 import json
+import logging
 import time
-from datetime import datetime, timezone
-from functools import wraps
-from typing import Any, Callable
-from langchain_openai import ChatOpenAI
-from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.messages import HumanMessage
-from langsmith import traceable
+from datetime import UTC, datetime
+
 from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 load_dotenv()
 
@@ -26,7 +23,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record):
         log_obj = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
             "module": record.module,
@@ -135,7 +132,6 @@ class InstrumentedLLM:
     @traceable(name="instrumented_invoke")
     def invoke(self, query: str) -> str:
         start_time = time.time()
-        error = False
 
         try:
             response = self.llm.invoke(query)
@@ -167,7 +163,6 @@ class InstrumentedLLM:
             return result
 
         except Exception as e:
-            error = True
             self.metrics.record_request(
                 latency_ms=(time.time() - start_time) * 1000,
                 input_tokens=0,

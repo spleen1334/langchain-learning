@@ -1,10 +1,7 @@
+
 from dotenv import load_dotenv
-import os
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 load_dotenv()
 
@@ -58,7 +55,6 @@ messages = prompt.format_messages(
 
 # Fewshot example
 from langchain_core.prompts import FewShotChatMessagePromptTemplate
-
 
 examples = [
     {"input": "happy", "output": "sad"},

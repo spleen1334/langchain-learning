@@ -1,13 +1,13 @@
-from dotenv import load_dotenv
 from importlib.metadata import version
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
 core_version = version("langchain-core")
 lg_version = version("langgraph")
-from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
-
+from langchain_openai import ChatOpenAI
 
 print(f"langchain-core version: {core_version}")
 print(f"langgraph version: {lg_version}")

@@ -3,10 +3,10 @@ LangChain Core Concepts - LCEL and Runnables
 """
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from langchain.chat_models import init_chat_model
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -117,16 +117,16 @@ def new_way():
 
     # Or provider-specific (still works)
 
-    from langchain_openai import ChatOpenAI
     from langchain_anthropic import ChatAnthropic
+    from langchain_openai import ChatOpenAI
 
-    openai_model = ChatOpenAI(model="gpt-4o-mini",
-                              temperature=0.7,
-                              max_tokens=1500,
-                              timeout=30,
-                              max_retries=3)
-    
+    openai_model = ChatOpenAI(
+        model="gpt-4o-mini", temperature=0.7, max_tokens=1500, timeout=30, max_retries=3
+    )
+
     anthropic_model = ChatAnthropic(model="claude-sonnet-4-5-20250929")
+
+    return model, openai_model, anthropic_model
 
 
 if __name__ == "__main__":

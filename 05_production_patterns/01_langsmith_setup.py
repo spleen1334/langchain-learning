@@ -4,12 +4,12 @@ Production monitoring for LangChain/LangGraph
 """
 
 import os
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langsmith import traceable
-from langsmith.run_trees import RunTree
+
 from dotenv import load_dotenv
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 load_dotenv()
 

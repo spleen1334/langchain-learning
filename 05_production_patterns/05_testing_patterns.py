@@ -3,15 +3,14 @@ Testing & Evaluation Patterns
 Building reliable LLM applications
 """
 
-import pytest
-from unittest.mock import Mock, patch
-from typing import Callable
-from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import AIMessage
-from langsmith import traceable, Client
+from collections.abc import Callable
+from unittest.mock import Mock
+
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langsmith import Client, traceable
 
 load_dotenv()
 
@@ -130,7 +129,7 @@ class LLMEvaluator:
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
     @traceable(name="evaluate_response")
-    def evaluate(self, question: str, response: str, reference: str = None) -> dict:
+    def evaluate(self, question: str, response: str, reference: str | None = None) -> dict:
         """Evaluate a response on multiple dimensions."""
 
         eval_prompt = ChatPromptTemplate.from_template(
@@ -283,12 +282,9 @@ LangSmith Evaluation Datasets — Production Approach
 Persistent, versioned test suites for LLM applications
 """
 
-from langsmith import Client
-from langsmith.evaluation import evaluate
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langsmith import traceable
 from dotenv import load_dotenv
+from langsmith import traceable
+from langsmith.evaluation import evaluate
 
 load_dotenv()
 

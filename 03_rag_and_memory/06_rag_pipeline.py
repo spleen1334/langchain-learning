@@ -3,20 +3,18 @@ Building RAG Pipelines
 Complete retrieval-augmented generation implementation
 """
 
-from langchain_openai.embeddings import OpenAIEmbeddings
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel
-from langchain_core.output_parsers import StrOutputParser
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain.chat_models import init_chat_model
+import tempfile
 
+from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, Field
-from typing import List
-from dotenv import load_dotenv
-import tempfile
 
 load_dotenv()
 embeddings_model = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -164,7 +162,7 @@ Answer (include sources):"""
 
     print("RAG with Sources:\n")
     answer = rag_chain.invoke("What are the core components of LangChain?")
-    print(f"Q: What are the core components?\n")
+    print("Q: What are the core components?\n")
     print(f"A: {answer}")
 
 
@@ -221,7 +219,7 @@ def demo_structured_rag():
 
         answer: str = Field(description="The answer to the question")
         confidence: str = Field(description="high, medium, or low")
-        sources_used: List[str] = Field(description="List of sources referenced")
+        sources_used: list[str] = Field(description="List of sources referenced")
         follow_up: str = Field(description="Suggested follow-up question")
 
     structured_llm = llm.with_structured_output(RAGResponse)

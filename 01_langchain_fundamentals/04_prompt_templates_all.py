@@ -2,18 +2,18 @@
 Prompt Templates and Messages in LangChain V.1
 """
 
+from dotenv import load_dotenv
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+)
 from langchain_core.prompts import (
     ChatPromptTemplate,
     FewShotChatMessagePromptTemplate,
     MessagesPlaceholder,
 )
-from langchain_core.messages import (
-    SystemMessage,
-    HumanMessage,
-    AIMessage,
-)
 from langchain_openai import ChatOpenAI
-from dotenv import load_dotenv
 
 load_dotenv()
 

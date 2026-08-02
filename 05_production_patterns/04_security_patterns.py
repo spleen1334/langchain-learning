@@ -4,13 +4,12 @@ Protecting LLM applications in production
 """
 
 import re
-from typing import Optional
-from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langsmith import traceable
+from typing import ClassVar
+
 from dotenv import load_dotenv
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 load_dotenv()
 
@@ -19,7 +18,7 @@ load_dotenv()
 class InputSanitizer:
     """Sanitize user input before processing."""
 
-    INJECTION_PATTERNS = [
+    INJECTION_PATTERNS: ClassVar[list[str]] = [
         r"ignore\s+(all\s+)?previous\s+instructions",
         r"forget\s+(all\s+)?previous",
         r"new\s+instructions:",
@@ -33,7 +32,7 @@ class InputSanitizer:
     def __init__(self):
         self.patterns = [re.compile(p, re.IGNORECASE) for p in self.INJECTION_PATTERNS]
 
-    def is_suspicious(self, text: str) -> tuple[bool, Optional[str]]:
+    def is_suspicious(self, text: str) -> tuple[bool, str | None]:
         """Check if input contains suspicious patterns."""
         for pattern in self.patterns:
             if pattern.search(text):
@@ -80,7 +79,7 @@ def demo_input_sanitization():
 class PIIDetector:
     """Detect and mask personally identifiable information."""
 
-    PATTERNS = {
+    PATTERNS: ClassVar[dict[str, str]] = {
         "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
         "phone": r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
         "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
@@ -205,7 +204,7 @@ class OutputValidator:
     def __init__(self):
         self.pii_detector = PIIDetector()
 
-    def validate(self, output: str) -> tuple[bool, str, Optional[str]]:
+    def validate(self, output: str) -> tuple[bool, str, str | None]:
         """
         Validate output.
         Returns: (is_valid, cleaned_output, reason_if_invalid)
@@ -337,7 +336,7 @@ def demo_secure_pipeline():
         result = pipeline.process(text)
 
         if result["blocked"]:
-            print(f"  ⚠️ BLOCKED")
+            print("  ⚠️ BLOCKED")
         else:
             print(f"  ✅ Output: {result['output'][:80]}...")
 

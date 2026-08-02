@@ -3,13 +3,13 @@ Section 1 Project: Smart Q&A Bot
 A production-ready question-answering bot with structured output
 """
 
+import os
+
+from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from langsmith import traceable
 from pydantic import BaseModel, Field
-from typing import List
-from dotenv import load_dotenv
-from langsmith import traceable, Client
-import os
 
 load_dotenv()
 
@@ -25,7 +25,7 @@ class QAResponse(BaseModel):
     answer: str = Field(description="The answer to the user's question.")
     confidence: str = Field(description="Confidence level: high, medium, or low")
     reasoning: str = Field(description="The reasoning behind the answer provided.")
-    follow_up_questions: List[str] = Field(
+    follow_up_questions: list[str] = Field(
         description="A list of follow-up questions related to the topic.",
         default_factory=list,
     )
@@ -83,7 +83,7 @@ Always respond with accurate, helpful information.""",
             )
 
     @traceable(name="ask_batch", run_type="chain")
-    def ask_batch(self, questions: List[str]) -> List[QAResponse]:
+    def ask_batch(self, questions: list[str]) -> list[QAResponse]:
         """Ask multiple questions in parallel."""
         inputs = [{"question": q} for q in questions]
         return self.chain.batch(inputs)

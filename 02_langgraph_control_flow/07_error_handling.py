@@ -3,18 +3,20 @@ Error Handling and Reliability Patterns
 Building robust LangGraph applications
 """
 
-import time
-import random
-from typing import Literal, Optional, Callable
-from functools import wraps
-from langchain_anthropic import ChatAnthropic
-from langgraph.graph import StateGraph, START, END
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage
-from typing_extensions import TypedDict, Annotated
 import operator
-from langsmith import traceable
+import random
+import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Annotated, Literal
+
 from dotenv import load_dotenv
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langsmith import traceable
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -110,14 +112,14 @@ class CircuitBreaker:
 
             return result
 
-        except Exception as e:
+        except Exception:
             self.failures += 1
             self.last_failure_time = time.time()
 
             if self.failures >= self.failure_threshold:
                 self.state = "open"
 
-            raise e
+            raise
 
 
 def demo_circuit_breaker():
@@ -190,7 +192,7 @@ class FallbackChain:
                 return result, model_name
 
             except Exception as e:
-                errors.append(f"{model_name}: {str(e)}")
+                errors.append(f"{model_name}: {e!s}")
                 continue
 
         # All models failed
@@ -226,7 +228,7 @@ def demo_fallback_chain():
 
 class RobustState(TypedDict):
     messages: Annotated[list, operator.add]
-    error: Optional[str]
+    error: str | None
     retry_count: int
     max_retries: int
     success: bool

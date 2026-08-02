@@ -1,10 +1,10 @@
-from langchain.chat_models import init_chat_model
-from langgraph.graph import StateGraph, START, END
-from typing_extensions import TypedDict, Annotated
-from typing import Literal
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
 import operator
+from typing import Annotated, Literal
+
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -46,8 +46,7 @@ def demo_self_correcting_code():
         # Clean up markdown code blocks if present
         if code.startswith("```"):
             code = code.split("```")[1]
-            if code.startswith("python"):
-                code = code[6:]
+            code = code.removeprefix("python")
 
         return {"code": code, "iteration": state["iteration"] + 1}
 
@@ -93,9 +92,7 @@ def demo_self_correcting_code():
         return {"success": True}
 
     def should_continue(state: CodeGenState) -> Literal["generate", "end"]:
-        if state["success"]:
-            return "end"
-        elif state["iteration"] >= state["max_iterations"]:
+        if state["success"] or state["iteration"] >= state["max_iterations"]:
             return "end"
         else:
             return "generate"
@@ -178,7 +175,7 @@ def demo_iterative_research():
 
     def generate_questions(state: ResearchState) -> dict:
         print(f"\n{'─' * 50}")
-        print(f"🤔 [QUESTIONING] Analyzing latest findings...")
+        print("🤔 [QUESTIONING] Analyzing latest findings...")
 
         response = llm.invoke(
             f"Based on this finding:\n{state['findings'][-1]}\n\n"
@@ -247,7 +244,7 @@ def demo_iterative_research():
     )
 
     print(f"\n{'=' * 50}")
-    print(f"📊 RESEARCH COMPLETE")
+    print("📊 RESEARCH COMPLETE")
     print(f"   Topic: {result['topic']}")
     print(f"   Depth reached: {result['iteration']}")
     print(f"   Findings collected: {len(result['findings'])}")

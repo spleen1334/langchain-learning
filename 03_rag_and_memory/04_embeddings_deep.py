@@ -1,6 +1,6 @@
-from langchain_openai.embeddings import OpenAIEmbeddings
-from dotenv import load_dotenv
 import numpy as np
+from dotenv import load_dotenv
+from langchain_openai.embeddings import OpenAIEmbeddings
 from ollama import embeddings
 
 load_dotenv()
@@ -67,10 +67,10 @@ def similarity_search():
 
 # Caching ---
 def embedding_caching():
-    from langchain_classic.embeddings.cache import CacheBackedEmbeddings
-
-    from langchain_classic.storage import LocalFileStore
     import tempfile
+
+    from langchain_classic.embeddings.cache import CacheBackedEmbeddings
+    from langchain_classic.storage import LocalFileStore
 
     with tempfile.TemporaryDirectory() as tempdir:
         store = LocalFileStore(root_path=tempdir)

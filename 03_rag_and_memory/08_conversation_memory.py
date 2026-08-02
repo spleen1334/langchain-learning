@@ -3,23 +3,23 @@ Conversation Memory in LangChain
 Modern approaches to maintaining conversation context
 """
 
-from langchain_openai import ChatOpenAI
+
+from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.chat_history import (
+    BaseChatMessageHistory,
+    InMemoryChatMessageHistory,
+)
 from langchain_core.messages import (
-    HumanMessage,
     AIMessage,
+    HumanMessage,
     SystemMessage,
     trim_messages,
 )
-from langchain_core.chat_history import (
-    InMemoryChatMessageHistory,
-    BaseChatMessageHistory,
-)
-from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.output_parsers import StrOutputParser
-from typing import Dict
-from dotenv import load_dotenv
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
@@ -49,7 +49,7 @@ def demo_basic_memory():
     chain = prompt | llm | StrOutputParser()
 
     # Session storage
-    store: Dict[str, InMemoryChatMessageHistory] = {}
+    store: dict[str, InMemoryChatMessageHistory] = {}
 
     def get_session_history(session_id: str) -> BaseChatMessageHistory:
         if session_id not in store:
@@ -104,7 +104,7 @@ def demo_multi_sessions():
 
     chain = prompt | llm | StrOutputParser()
 
-    store: Dict[str, InMemoryChatMessageHistory] = {}
+    store: dict[str, InMemoryChatMessageHistory] = {}
 
     def get_session_history(session_id: str) -> BaseChatMessageHistory:
         if session_id not in store:
@@ -218,7 +218,7 @@ def demo_windowed_memory():
             if len(self.messages) > self.k * 2:
                 self.messages = self.messages[-(self.k * 2) :]
 
-    store: Dict[str, WindowedChatHistory] = {}
+    store: dict[str, WindowedChatHistory] = {}
 
     def get_session_history(session_id: str) -> BaseChatMessageHistory:
         if session_id not in store:
@@ -294,8 +294,10 @@ def demo_summary_memory():
         [
             (
                 "system",
-                "You are a helpful assistant. Be concise.\n\n"
-                "Summary of earlier conversation:\n{summary}",
+                (
+                    "You are a helpful assistant. Be concise.\n\n"
+                    "Summary of earlier conversation:\n{summary}"
+                ),
             ),
             MessagesPlaceholder(variable_name="recent_messages"),
             ("human", "{input}"),
@@ -407,8 +409,9 @@ def exercise_persistent_memory():
     print("EXERCISE: Persistent Memory Chatbot")
     print("=" * 60)
 
-    from langchain_community.chat_message_histories import SQLChatMessageHistory
     import os
+
+    from langchain_community.chat_message_histories import SQLChatMessageHistory
 
     # Use SQLite for persistence
     db_path = "./chat_history.db"
@@ -473,9 +476,10 @@ def exercise_persistent_memory_proof():
     print("EXERCISE: Persistent Memory Chatbot")
     print("=" * 60)
 
-    from langchain_community.chat_message_histories import SQLChatMessageHistory
-    import sqlite3
     import os
+    import sqlite3
+
+    from langchain_community.chat_message_histories import SQLChatMessageHistory
 
     db_path = "./chat_history.db"
     connection_string = f"sqlite:///{db_path}"

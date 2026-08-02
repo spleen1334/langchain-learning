@@ -3,15 +3,17 @@ Checkpointing and Persistence in LangGraph
 Save and resume agent state
 """
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.sqlite import SqliteSaver
-from typing_extensions import TypedDict, Annotated
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 import operator
 import tempfile
+from typing import Annotated
+
 from dotenv import load_dotenv
+from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -74,7 +76,7 @@ def demo_sqlite_persistence():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
 
-    print(f"\nSQLite Persistence Demo:")
+    print("\nSQLite Persistence Demo:")
     print(f"Database: {db_path}\n")
 
     # First session
@@ -90,7 +92,7 @@ def demo_sqlite_persistence():
             },
             config,
         )
-        print(f"Session 1 - Stored secret code")
+        print("Session 1 - Stored secret code")
 
         # PostgresSaver with a real database!
         # Simulate app restart - new session
@@ -257,31 +259,31 @@ def demo_checkpoint_internals():
         print(f"     [{i}] {role}: {msg.content[:80]}...")
 
     # state.next — which node runs next (empty = graph finished)
-    print(f"\n2) state.next (pending node):")
+    print("\n2) state.next (pending node):")
     print(f"   {state.next if state.next else '() — graph finished, no pending nodes'}")
 
     # state.config — the config that produced this snapshot
-    print(f"\n3) state.config (thread + checkpoint IDs):")
+    print("\n3) state.config (thread + checkpoint IDs):")
     print(f"   thread_id:     {state.config['configurable']['thread_id']}")
     print(f"   checkpoint_id: {state.config['configurable']['checkpoint_id']}")
 
     # state.metadata — who created this checkpoint
-    print(f"\n4) state.metadata (provenance info):")
+    print("\n4) state.metadata (provenance info):")
     print(f"   source:  {state.metadata.get('source', 'N/A')}")
     print(f"   step:    {state.metadata.get('step', 'N/A')}")
     print(f"   writes:  {state.metadata.get('writes', 'N/A')}")
 
     # state.parent_config — pointer to the PREVIOUS checkpoint
-    print(f"\n5) state.parent_config (previous checkpoint):")
+    print("\n5) state.parent_config (previous checkpoint):")
     if state.parent_config:
         print(
             f"   parent checkpoint_id: {state.parent_config['configurable']['checkpoint_id']}"
         )
     else:
-        print(f"   None — this is the very first checkpoint")
+        print("   None — this is the very first checkpoint")
 
     # state.created_at — timestamp
-    print(f"\n6) state.created_at (when saved):")
+    print("\n6) state.created_at (when saved):")
     print(f"   {state.created_at}")
 
     # ════════════════════════════════════════════════════════
@@ -300,7 +302,7 @@ def demo_checkpoint_internals():
         current_step = snapshot.values.get("step", "")
 
         # Which node just wrote to this checkpoint?
-        node_name = list(writes.keys())[0] if writes else "—"
+        node_name = next(iter(writes.keys())) if writes else "—"
 
         print(f"  Checkpoint {i}:")
         print(f"    id:         {checkpoint_id[:30]}...")
@@ -340,9 +342,9 @@ def demo_checkpoint_internals():
 
         rewound_state = app.get_state(rewind_config)
         print(f"\n  Loaded checkpoint — next node would be: {rewound_state.next}")
-        print(f"  We're back to BEFORE 'summarize' ran!")
+        print("  We're back to BEFORE 'summarize' ran!")
         print(
-            f"  Calling invoke(None) from here would re-run 'summarize' with fresh output."
+            "  Calling invoke(None) from here would re-run 'summarize' with fresh output."
         )
     else:
         print("  Could not find target checkpoint.")

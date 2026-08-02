@@ -3,17 +3,15 @@ Understanding Chains in LangChain V.1
 LCEL patterns, composition, and debugging
 """
 
-from unittest import result
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
 from langchain.chat_models import init_chat_model
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import (
+    RunnableBranch,
+    RunnableLambda,
     RunnableParallel,
     RunnablePassthrough,
-    RunnableLambda,
-    RunnableBranch,
 )
 
 load_dotenv()

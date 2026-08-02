@@ -9,17 +9,18 @@ Patterns used:
 - Iterative refinement loop
 """
 
-from langgraph.graph import StateGraph, START, END
+import json
+import operator
+from typing import Annotated, Literal
+
+from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.types import Send
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
-from typing_extensions import TypedDict, Annotated
-from typing import Literal
 from pydantic import BaseModel, Field
-import operator
-import json
-from dotenv import load_dotenv
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -370,13 +371,13 @@ def demo_research_with_streaming():
             print(f"[{node_name}] completed")
 
             # Show interesting state changes
-            if "search_queries" in update and update["search_queries"]:
+            if update.get("search_queries"):
                 print(f"  Planned queries: {update['search_queries']}")
-            if "findings" in update and update["findings"]:
+            if update.get("findings"):
                 print(f"  Found {len(update['findings'])} results")
             if "quality_score" in update:
                 print(f"  Quality score: {update['quality_score']:.1f}")
-            if "report" in update and update["report"]:
+            if update.get("report"):
                 print(f"  Report length: {len(update['report'])} chars")
 
         print()
@@ -404,7 +405,7 @@ def demo_individual_search():
         {"search_query": "LangGraph multi-agent patterns", "findings": []}
     )
 
-    print(f"Findings from search:")
+    print("Findings from search:")
     for f in result["findings"]:
         print(f"  - {f.get('title', 'N/A')}: {f.get('detail', 'N/A')[:80]}...")
 

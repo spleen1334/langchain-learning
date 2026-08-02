@@ -3,13 +3,12 @@ Working with LLMs in LangChain V.1
 Multiple providers, configuration, streaming, and cost optimization
 """
 
-from dotenv import load_dotenv
 import os
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+
+from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 load_dotenv()
 

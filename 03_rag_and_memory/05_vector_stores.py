@@ -1,10 +1,10 @@
-from langchain_openai.embeddings import OpenAIEmbeddings
+import tempfile
+
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import tempfile
-import shutil
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -217,15 +217,21 @@ def exercise_vector_store_setup():
     # Test the function
     # Test
     sample_texts = [
-        "Python is a versatile programming language used in web development, "
-        "data science, machine learning, and automation. It has a simple syntax "
-        "that makes it easy to learn and read.",
-        "JavaScript is the language of the web. It runs in browsers and on "
-        "servers with Node.js. Modern frameworks like React and Vue make "
-        "building web applications efficient.",
-        "Rust is a systems programming language focused on safety and "
-        "performance. It prevents common bugs like null pointer dereferences "
-        "and data races at compile time.",
+        (
+            "Python is a versatile programming language used in web development, "
+            "data science, machine learning, and automation. It has a simple syntax "
+            "that makes it easy to learn and read."
+        ),
+        (
+            "JavaScript is the language of the web. It runs in browsers and on "
+            "servers with Node.js. Modern frameworks like React and Vue make "
+            "building web applications efficient."
+        ),
+        (
+            "Rust is a systems programming language focused on safety and "
+            "performance. It prevents common bugs like null pointer dereferences "
+            "and data races at compile time."
+        ),
     ]
 
     retriever = create_retriever(sample_texts, chunk_size=200, chunk_overlap=20, k=2)

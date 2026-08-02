@@ -4,13 +4,11 @@ Reducing LLM costs in production
 """
 
 import hashlib
-import json
-from typing import Optional, Callable
-from functools import lru_cache
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langsmith import traceable
+
 from dotenv import load_dotenv
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 load_dotenv()
 
@@ -111,7 +109,7 @@ class SemanticCache:
         normalized = query.lower().strip()
         return hashlib.md5(normalized.encode()).hexdigest()
 
-    def get(self, query: str) -> Optional[str]:
+    def get(self, query: str) -> str | None:
         """Get cached response if similar query exists."""
         query_hash = self._hash_query(query)
 

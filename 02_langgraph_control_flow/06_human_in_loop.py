@@ -3,13 +3,13 @@ Human-in-the-Loop Patterns in LangGraph
 Interrupt, review, modify, and resume
 """
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from typing_extensions import TypedDict
 from typing import Literal
-from langchain_openai import ChatOpenAI
+
 from dotenv import load_dotenv
-import time
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -46,7 +46,7 @@ def demo_interrupt_for_approval():
     def create_draft(state: ApprovalState) -> dict:
         step_print("📝", "DRAFT NODE", "Entering create_draft node...")
         print(f"   Request: \"{state['request']}\"")
-        print(f"   Calling LLM to generate draft...")
+        print("   Calling LLM to generate draft...")
 
         response = llm.invoke(f"Create a professional response for: {state['request']}")
 
@@ -70,10 +70,10 @@ def demo_interrupt_for_approval():
         print(f"   Approved: {state['approved']}")
 
         if state["approved"]:
-            print(f"   Action: Using draft as-is (human approved)")
+            print("   Action: Using draft as-is (human approved)")
             return {"final": state["draft"]}
         else:
-            print(f"   Action: Revising draft based on feedback...")
+            print("   Action: Revising draft based on feedback...")
             print(f"   Feedback: \"{state['feedback']}\"")
             # Incorporate feedback
             response = llm.invoke(
@@ -130,14 +130,14 @@ def demo_interrupt_for_approval():
     step_print("⏸️", "PAUSED", "Graph execution interrupted!")
     print(f"   Draft is ready: {result['draft'][:150]}...")
     print(f"   Final is empty: '{result['final']}'")
-    print(f"\n   The graph is now FROZEN. Waiting for human input.")
-    print(f"   In a real app, your frontend would show the draft here.")
+    print("\n   The graph is now FROZEN. Waiting for human input.")
+    print("   In a real app, your frontend would show the draft here.")
 
     # ─── PHASE 2: Inspect paused state ───
     phase_banner(2, "INSPECT PAUSED STATE")
 
     current_state = app.get_state(config)
-    print(f"   app.get_state(config) tells us:")
+    print("   app.get_state(config) tells us:")
     print(f"   Next node(s): {current_state.next}")
     print(f"   State keys: {list(current_state.values.keys())}")
     print(f"   Draft filled: {'Yes' if current_state.values['draft'] else 'No'}")
@@ -150,18 +150,18 @@ def demo_interrupt_for_approval():
     feedback_text = (
         "Make it more concise and add specific mention of the company culture"
     )
-    print(f"   Human decision: REJECT (request changes)")
+    print("   Human decision: REJECT (request changes)")
     print(f'   Human feedback: "{feedback_text}"')
-    print(f"\n   Calling app.update_state() to inject human input...")
+    print("\n   Calling app.update_state() to inject human input...")
 
     # Update state with human input
     app.update_state(
         config, {"approved": False, "feedback": feedback_text}  # Request changes
     )
 
-    print(f"   State updated. approved=False, feedback set.")
-    print(f"\n   Calling app.invoke(None, config) to RESUME...")
-    print(f"   (None means 'no new input, just continue from checkpoint')\n")
+    print("   State updated. approved=False, feedback set.")
+    print("\n   Calling app.invoke(None, config) to RESUME...")
+    print("   (None means 'no new input, just continue from checkpoint')\n")
 
     # Continue execution
     final_result = app.invoke(None, config)
@@ -170,9 +170,9 @@ def demo_interrupt_for_approval():
     step_print("✅", "WORKFLOW COMPLETE", "")
     print(f"   Final result ({len(final_result['final'].split())} words):")
     print(f"   {final_result['final'][:200]}...")
-    print(f"\n   Graph path taken:")
+    print("\n   Graph path taken:")
     print(
-        f"   START -> [draft] -> ⏸️ PAUSE -> human feedback -> [approval] -> [finalize] -> END"
+        "   START -> [draft] -> ⏸️ PAUSE -> human feedback -> [approval] -> [finalize] -> END"
     )
 
 
@@ -194,7 +194,7 @@ def demo_iterative_review():
     def submit_for_review(state: ReviewState) -> dict:
         step_print("📋", "SUBMIT NODE", f"Round {state['revision_count'] + 1}")
         print(f"   Status incoming: '{state['status']}'")
-        print(f"   Setting status to 'pending_review'")
+        print("   Setting status to 'pending_review'")
         print(f"   Document preview: {state['document'][:100]}...")
         return {"status": "pending_review"}
 
@@ -204,13 +204,13 @@ def demo_iterative_review():
         )
 
         if not state["review_comments"]:
-            print(f"   No comments to apply. Passing through.")
+            print("   No comments to apply. Passing through.")
             return state
 
         feedback = state["review_comments"][-1]
         print(f'   Feedback to apply: "{feedback}"')
         print(f"   Current document: {state['document'][:80]}...")
-        print(f"   Calling LLM to revise...")
+        print("   Calling LLM to revise...")
 
         response = llm.invoke(
             f"Revise this document based on feedback:\n\n"
@@ -230,9 +230,9 @@ def demo_iterative_review():
     def route_after_review(state: ReviewState) -> Literal["apply", "done"]:
         step_print("🔀", "ROUTER", f"Checking status: '{state['status']}'")
         if state["status"] == "approved":
-            print(f"   Decision: APPROVED -> routing to 'done' node")
+            print("   Decision: APPROVED -> routing to 'done' node")
             return "done"
-        print(f"   Decision: NOT APPROVED -> routing to 'apply' node")
+        print("   Decision: NOT APPROVED -> routing to 'apply' node")
         return "apply"
 
     def finalize(state: ReviewState) -> dict:
@@ -291,21 +291,21 @@ def demo_iterative_review():
 
     current_state = app.get_state(config)
     print(f"   Next node: {current_state.next}")
-    print(f"\n   Waiting for human reviewer...")
+    print("\n   Waiting for human reviewer...")
 
     # ─── ROUND 1: Reviewer wants changes ───
     phase_banner(1, "REVIEWER REQUESTS CHANGES")
 
     feedback_1 = "Add more technical depth and examples"
     print(f'   Reviewer says: "{feedback_1}"')
-    print(f"   Reviewer sets status: 'needs_revision'")
-    print(f"\n   Calling app.update_state() to inject review...")
+    print("   Reviewer sets status: 'needs_revision'")
+    print("\n   Calling app.update_state() to inject review...")
 
     app.update_state(
         config, {"review_comments": [feedback_1], "status": "needs_revision"}
     )
 
-    print(f"   State updated. Calling app.invoke(None) to resume...\n")
+    print("   State updated. Calling app.invoke(None) to resume...\n")
 
     result = app.invoke(None, config)
 
@@ -315,20 +315,20 @@ def demo_iterative_review():
 
     current_state = app.get_state(config)
     print(f"   Next node: {current_state.next}")
-    print(f"\n   Waiting for human reviewer again...")
+    print("\n   Waiting for human reviewer again...")
 
     # ─── ROUND 2: Reviewer wants more changes ───
     phase_banner(2, "REVIEWER REQUESTS MORE CHANGES")
 
     feedback_2 = "Good improvement! Now add a concrete example of neural networks"
     print(f'   Reviewer says: "{feedback_2}"')
-    print(f"   Reviewer sets status: 'needs_revision'")
+    print("   Reviewer sets status: 'needs_revision'")
 
     app.update_state(
         config, {"review_comments": [feedback_2], "status": "needs_revision"}
     )
 
-    print(f"   Resuming graph...\n")
+    print("   Resuming graph...\n")
 
     result = app.invoke(None, config)
 
@@ -339,12 +339,12 @@ def demo_iterative_review():
     # ─── ROUND 3: Reviewer approves ───
     phase_banner(3, "REVIEWER APPROVES")
 
-    print(f'   Reviewer says: "Looks great!"')
-    print(f"   Reviewer sets status: 'approved'")
+    print('   Reviewer says: "Looks great!"')
+    print("   Reviewer sets status: 'approved'")
 
     app.update_state(config, {"status": "approved"})
 
-    print(f"   Resuming graph for final time...\n")
+    print("   Resuming graph for final time...\n")
 
     final = app.invoke(None, config)
 
@@ -353,11 +353,11 @@ def demo_iterative_review():
     print(f"   Final status: {final['status']}")
     print(f"   Total revisions: {final['revision_count']}")
     print(f"   Final document: {final['document'][:200]}...")
-    print(f"\n   Full timeline:")
-    print(f"   Round 0: START -> ⏸️ (human reviews initial doc)")
-    print(f"   Round 1: resume -> [submit] -> [apply] -> ⏸️ (human reviews revision 1)")
-    print(f"   Round 2: resume -> [submit] -> [apply] -> ⏸️ (human reviews revision 2)")
-    print(f"   Round 3: resume -> [submit] -> [done] -> END (human approved!)")
+    print("\n   Full timeline:")
+    print("   Round 0: START -> ⏸️ (human reviews initial doc)")
+    print("   Round 1: resume -> [submit] -> [apply] -> ⏸️ (human reviews revision 1)")
+    print("   Round 2: resume -> [submit] -> [apply] -> ⏸️ (human reviews revision 2)")
+    print("   Round 3: resume -> [submit] -> [done] -> END (human approved!)")
 
 
 if __name__ == "__main__":

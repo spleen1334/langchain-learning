@@ -3,16 +3,17 @@ Agent Communication Patterns in LangGraph
 Shared state, message passing, and blackboard pattern
 """
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
-from typing_extensions import TypedDict, Annotated
-from typing import Literal
-from pydantic import BaseModel, Field
-import operator
 import json
+import operator
+from typing import Annotated, Literal
+
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -271,7 +272,7 @@ def demo_shared_state():
     print(f"\nAnalysis: {result['analysis'][:200]}...")
     print(f"Confidence: {result['confidence_score']}")
 
-    print(f"\nRecommendations:")
+    print("\nRecommendations:")
     for i, rec in enumerate(result["recommendations"], 1):
         print(f"  {i}. {rec}")
 

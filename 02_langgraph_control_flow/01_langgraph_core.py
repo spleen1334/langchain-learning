@@ -3,13 +3,14 @@ LangGraph Core Concepts
 StateGraph, nodes, edges, and basic patterns
 """
 
-from langchain.chat_models import init_chat_model
-from langgraph.graph import StateGraph, START, END
-from typing_extensions import TypedDict, Annotated
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
 import operator
+from typing import Annotated
+
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import BaseMessage, HumanMessage
+from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 load_dotenv()
 

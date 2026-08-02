@@ -3,28 +3,22 @@ Section 2 Project: AI Research Assistant
 Complete RAG system with conversation memory
 """
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from datetime import UTC, datetime
+
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_classic.retrievers.multi_query import MultiQueryRetriever
 from langchain_core.chat_history import (
-    InMemoryChatMessageHistory,
     BaseChatMessageHistory,
+    InMemoryChatMessageHistory,
 )
 from langchain_core.documents import Document
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_classic.retrievers.multi_query import MultiQueryRetriever
-from langchain_classic.retrievers import ContextualCompressionRetriever
-from langchain_classic.retrievers.document_compressors import LLMChainExtractor
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
-from datetime import datetime
-from dotenv import load_dotenv
-import json
-
 
 load_dotenv()
 
@@ -37,11 +31,11 @@ class ResearchResponse(BaseModel):
 
     answer: str = Field(description="The answer to the question")
     confidence: str = Field(description="high, medium, or low based on source quality")
-    sources: List[str] = Field(description="List of source documents used")
-    key_quotes: List[str] = Field(
+    sources: list[str] = Field(description="List of source documents used")
+    key_quotes: list[str] = Field(
         description="Relevant quotes from sources", default=[]
     )
-    follow_up_questions: List[str] = Field(description="Suggested follow-up questions")
+    follow_up_questions: list[str] = Field(description="Suggested follow-up questions")
 
 
 # ============================================================
@@ -79,16 +73,16 @@ class AIResearchAssistant:
             collection_name="research_docs",
         )
 
-        self.session_store: Dict[str, InMemoryChatMessageHistory] = {}
+        self.session_store: dict[str, InMemoryChatMessageHistory] = {}
 
-        print(f"Research Assistant initialized")
+        print("Research Assistant initialized")
         print(f"  Vector store: {persist_directory}")
         print(f"  Documents indexed: {self.vectorstore._collection.count()}")
 
     def add_documents(
         self,
-        documents: List[Document],
-        source_name: Optional[str] = None,
+        documents: list[Document],
+        source_name: str | None = None,
     ) -> int:
         """Add documents to the research database."""
 
@@ -102,7 +96,7 @@ class AIResearchAssistant:
 
         # Timestamp each chunk
         for chunk in chunks:
-            chunk.metadata["indexed_at"] = datetime.now().isoformat()
+            chunk.metadata["indexed_at"] = datetime.now(UTC).isoformat()
 
         # Store in vector DB
         self.vectorstore.add_documents(chunks)
@@ -110,14 +104,14 @@ class AIResearchAssistant:
         print(f"Added {len(chunks)} chunks from {len(documents)} documents")
         return len(chunks)
 
-    def add_text(self, text: str, source: str, metadata: dict = None) -> int:
+    def add_text(self, text: str, source: str, metadata: dict | None = None) -> int:
         """Add a single text string as a document."""
         doc = Document(
             page_content=text, metadata={"source": source, **(metadata or {})}
         )
         return self.add_documents([doc])
 
-    def add_texts(self, texts: List[str], source: str) -> int:
+    def add_texts(self, texts: list[str], source: str) -> int:
         """Add multiple text strings from the same source."""
         docs = [Document(page_content=t, metadata={"source": source}) for t in texts]
         return self.add_documents(docs)
@@ -126,14 +120,14 @@ class AIResearchAssistant:
         """Get total number of indexed chunks."""
         return self.vectorstore._collection.count()
 
-    def list_sources(self) -> List[str]:
+    def list_sources(self) -> list[str]:
         """List all unique sources in the database."""
         results = self.vectorstore._collection.get()
         sources = set()
         for metadata in results.get("metadatas", []):
             if metadata and "source" in metadata:
                 sources.add(metadata["source"])
-        return sorted(list(sources))
+        return sorted(sources)
 
     def _build_retriever(self, use_advanced: bool = False):
         """Build retriever -- basic or advanced"""
@@ -189,7 +183,7 @@ class AIResearchAssistant:
         retriever = self._build_retriever(use_advanced=use_advanced)
         docs = retriever.invoke(question)
         context = self._format_docs_for_context(docs)
-        sources = list(set(d.metadata.get("source", "Unknown") for d in docs))
+        sources = list({d.metadata.get("source", "Unknown") for d in docs})
 
         # Prompt -- tell the LLM about available sources
         prompt = ChatPromptTemplate.from_messages(
@@ -370,7 +364,7 @@ class AIResearchAssistant:
             reduction = round((1 - advanced_total_chars / basic_total_chars) * 100)
             print(f"  Compression saved {reduction}% of tokens!")
         else:
-            print(f"  Advanced found more targeted content")
+            print("  Advanced found more targeted content")
 
 
 def print_research_response(question: str, response: ResearchResponse):
@@ -382,11 +376,11 @@ def print_research_response(question: str, response: ResearchResponse):
     print(f"  Sources: {', '.join(response.sources)}")
 
     if response.key_quotes:
-        print(f"\n  Key Quotes:")
+        print("\n  Key Quotes:")
         for q in response.key_quotes:
             print(f'    - "{q}"')
 
-    print(f"\n  Follow-up Questions:")
+    print("\n  Follow-up Questions:")
     for fq in response.follow_up_questions:
         print(f"    - {fq}")
 
@@ -487,11 +481,11 @@ if __name__ == "__main__":
     if r.confidence == "high":
         print(f"\n  Confident answer from: {', '.join(r.sources)}")
     else:
-        print(f"\n  Low confidence -- may need more sources")
+        print("\n  Low confidence -- may need more sources")
 
     print(f"\n  Answer: {r.answer[:200]}")
 
-    print(f"\n  Suggested follow-ups:")
+    print("\n  Suggested follow-ups:")
     for fq in r.follow_up_questions:
         print(f"    -> {fq}")
 

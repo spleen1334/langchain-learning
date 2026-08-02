@@ -1,10 +1,9 @@
-from langchain.chat_models import init_chat_model
-from langgraph.graph import StateGraph, START, END
-from typing_extensions import TypedDict, Annotated
 from typing import Literal
-from langchain_core.messages import HumanMessage, AIMessage, BaseMessage, SystemMessage
-import operator
+
 from dotenv import load_dotenv
+from langchain.chat_models import init_chat_model
+from langgraph.graph import END, START, StateGraph
+from typing_extensions import TypedDict
 
 load_dotenv()
 
@@ -112,7 +111,7 @@ def demo_conditional_loop():
         )
         try:
             score = int(response.content.strip())
-        except:
+        except ValueError:
             score = 5
         return {"quality_score": score}
 
@@ -176,7 +175,7 @@ def demo_conditional_loop():
         }
     )
 
-    print(f"Original: AI is cool")
+    print("Original: AI is cool")
     print(f"Final: {result['final_content'][:200]}...")
     print(f"Feedback: {result['feedback']}")
 
