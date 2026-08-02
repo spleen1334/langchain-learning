@@ -2,7 +2,14 @@
 
 ## What it is
 
-Retrieval-Augmented Generation: fetch relevant text at query time and put it in the prompt, so the model answers from your data instead of its training set. Fixes the three core LLM limitations — stale knowledge, no access to private data, and hallucination — and gives you source attribution for free.
+Retrieval-Augmented Generation: fetch relevant text at query time and put it in the prompt, so the model answers from your data instead of its training set.
+
+It fixes the three core LLM limitations:
+- Stale knowledge
+- No access to private data
+- Hallucination
+
+And gives you source attribution for free.
 
 ## The pipeline
 
@@ -13,14 +20,24 @@ Load → Split → Embed → Store → Retrieve → Augment prompt → Generate
 Indexing (load/split/embed/store) happens offline; retrieval and generation happen per query.
 
 ### 1. Load
-`Document(page_content, metadata)` is the universal unit. Loaders: `TextLoader`, `PyPDFLoader` (one Document per page, with page metadata), `WebBaseLoader` (bs4), `DirectoryLoader(glob=..., loader_cls=...)` — use `.lazy_load()` to stream large directories instead of materializing everything.
+`Document(page_content, metadata)` is the universal unit. Loaders:
 
-Put whatever you'll want to filter on into `metadata` at load time; retrofitting it later means re-indexing.
+- `TextLoader`
+- `PyPDFLoader` — one Document per page, with page metadata
+- `WebBaseLoader` — bs4-backed
+- `DirectoryLoader(glob=..., loader_cls=...)` — use `.lazy_load()` to stream large directories instead of materializing everything
+
+**Metadata is a load-time decision.** Put whatever you'll want to filter on into `metadata` at load time; retrofitting it later means re-indexing.
 
 → [`03_rag_and_memory/01_document_loaders.py`](../03_rag_and_memory/01_document_loaders.py)
 
 ### 2. Split
-Chunking is the highest-leverage knob in the whole pipeline. Too large → the embedding averages several topics and matches nothing precisely; too small → retrieved text lacks the context needed to answer.
+Chunking is the highest-leverage knob in the whole pipeline:
+
+- **Too large** → the embedding averages several topics and matches nothing precisely.
+- **Too small** → retrieved text lacks the context needed to answer.
+
+Tools:
 
 - `RecursiveCharacterTextSplitter(chunk_size, chunk_overlap, separators=["\n\n","\n"," ",""])` — the default; tries to break on paragraph, then line, then word.
 - `chunk_overlap` (~10–20% of chunk_size) prevents a fact from being severed at a boundary.
@@ -31,16 +48,27 @@ Chunking is the highest-leverage knob in the whole pipeline. Too large → the e
 → [`03_rag_and_memory/02_text_splitters.py`](../03_rag_and_memory/02_text_splitters.py)
 
 ### 3. Embed
-An embedding maps text to a fixed-length vector where semantic similarity ≈ cosine similarity. `embed_query(str)` for the question, `embed_documents([str])` for the corpus (some models embed the two asymmetrically).
+An embedding maps text to a fixed-length vector where semantic similarity ≈ cosine similarity.
 
-Model choice: `text-embedding-3-small` (1536 dims, ~$0.02/1M) is the sane default; `-3-large` (3072) when accuracy justifies 6× the price; `sentence-transformers/all-MiniLM-L6-v2` (384) or Ollama for local/private. **The query and the index must use the same model** — mixing them silently produces garbage.
+- `embed_query(str)` — for the question
+- `embed_documents([str])` — for the corpus (some models embed the two asymmetrically)
 
-`CacheBackedEmbeddings.from_bytes_store(underlying, store, namespace=...)` avoids re-paying for unchanged documents on re-index.
+Model choice:
+
+- `text-embedding-3-small` (1536 dims, ~$0.02/1M) — the sane default
+- `-3-large` (3072) — when accuracy justifies 6× the price
+- `sentence-transformers/all-MiniLM-L6-v2` (384) or Ollama — local/private
+- **The query and the index must use the same model** — mixing them silently produces garbage
+
+Caching: `CacheBackedEmbeddings.from_bytes_store(underlying, store, namespace=...)` avoids re-paying for unchanged documents on re-index.
 
 → [`03_rag_and_memory/03_embeddings.py`](../03_rag_and_memory/03_embeddings.py), [`04_embeddings_deep.py`](../03_rag_and_memory/04_embeddings_deep.py)
 
 ### 4. Store
-Vector stores index vectors for approximate nearest-neighbour search. This course uses **Chroma** (`langchain-chroma`); FAISS (local library), Pinecone/Qdrant (managed) and pgvector (Postgres extension) are the common alternatives.
+Vector stores index vectors for approximate nearest-neighbour search.
+
+- **This course uses Chroma** (`langchain-chroma`).
+- **Common alternatives** — FAISS (local library), Pinecone/Qdrant (managed), pgvector (Postgres extension).
 
 Key operations:
 - `Chroma.from_documents(docs, embedding, persist_directory=...)` — build and persist; reload with `Chroma(embedding_function=..., persist_directory=...)`
@@ -61,7 +89,8 @@ rag_chain = (
     | prompt | llm | StrOutputParser()
 )
 ```
-`RunnableParallel` (the dict literal) runs retrieval while passing the raw question through; `format_docs` joins page contents — include `doc.metadata["source"]` in that string if you want citations.
+- **`RunnableParallel`** (the dict literal) runs retrieval while passing the raw question through.
+- **`format_docs`** joins page contents — include `doc.metadata["source"]` in that string if you want citations.
 
 Prompt discipline matters as much as retrieval:
 - "Answer based **only** on the following context" — grounding
@@ -82,7 +111,8 @@ Plain top-k similarity fails in predictable ways; each strategy targets one fail
 | Parent-document | `ParentDocumentRetriever(vectorstore, docstore, child_splitter, parent_splitter)` | Precision-vs-context tradeoff — match on small chunks, return the large parent |
 | MMR | `as_retriever(search_type="mmr")` | Redundant near-duplicate results |
 
-They compose: the repo's advanced chain stacks multi-query under compression. Each layer costs extra LLM calls and latency — measure before adopting.
+- **They compose** — the repo's advanced chain stacks multi-query under compression.
+- **But they aren't free** — each layer costs extra LLM calls and latency; measure before adopting.
 
 → [`03_rag_and_memory/07_advanced_rag.py`](../03_rag_and_memory/07_advanced_rag.py)
 
@@ -96,7 +126,10 @@ RAG answers one question; memory makes it a conversation. Strategies, in ascendi
 - **Summary** — compress older turns into a running summary via a second LLM call, keep recent turns verbatim. Preserves facts at bounded cost; the demo shows name/city/job/pets all surviving.
 - **Persistence** — `SQLChatMessageHistory(session_id, connection="sqlite:///...")` so history survives process restarts. (In LangGraph the equivalent is a checkpointer keyed by `thread_id`.)
 
-Note that follow-up questions ("how does the second component work?") need history *before* retrieval to be resolvable — the research assistant handles this by passing history into the prompt alongside retrieved context.
+Note on follow-ups:
+
+- Questions like "how does the second component work?" need history *before* retrieval to be resolvable.
+- The research assistant handles this by passing history into the prompt alongside retrieved context.
 
 → [`03_rag_and_memory/08_conversation_memory.py`](../03_rag_and_memory/08_conversation_memory.py)
 

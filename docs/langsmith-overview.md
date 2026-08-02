@@ -2,9 +2,11 @@
 
 ## What it is
 
-LangSmith is the observability and evaluation platform for LLM apps. It records every model call as a nested **run tree** — inputs, outputs, latency, token counts, cost, errors — and adds datasets + experiment comparison on top so you can tell whether a prompt or model change actually improved anything.
+LangSmith is the observability and evaluation platform for LLM apps.
 
-It's independent of LangChain in principle (`@traceable` works on any Python function), but LangChain/LangGraph auto-instrument themselves when tracing is enabled.
+- **Tracing** — records every model call as a nested **run tree**: inputs, outputs, latency, token counts, cost, errors.
+- **Evaluation** — adds datasets + experiment comparison on top, so you can tell whether a prompt or model change actually improved anything.
+- **Independent of LangChain in principle** — `@traceable` works on any Python function — but LangChain/LangGraph auto-instrument themselves when tracing is enabled.
 
 ## Setup
 
@@ -16,14 +18,20 @@ LANGSMITH_API_KEY=ls__...
 LANGSMITH_PROJECT=My Project        # optional, groups runs
 ```
 
-That's it — any LCEL chain or compiled graph invoked afterwards is traced. Set `LANGSMITH_TRACING=false` to turn it off (`02_langgraph_control_flow/01_langgraph_core.py` has a note about toggling it per-demo).
+- **That's it** — any LCEL chain or compiled graph invoked afterwards is traced.
+- **To turn it off** — set `LANGSMITH_TRACING=false`; `02_langgraph_control_flow/01_langgraph_core.py` has a note about toggling it per-demo.
 
 → [`05_production_patterns/01_langsmith_setup.py`](../05_production_patterns/01_langsmith_setup.py)
 
 ## Core concepts
 
 ### Tracing and run trees
-A run is one unit of work. Chains nest their component runs, so a graph invocation produces a tree you can drill into: which node ran, what prompt it built, what the model returned, how long each step took.
+A run is one unit of work. Chains nest their component runs, so a graph invocation produces a tree you can drill into:
+
+- Which node ran
+- What prompt it built
+- What the model returned
+- How long each step took
 
 ### `@traceable`
 Decorate arbitrary Python to make it a named run in the tree:
@@ -32,18 +40,24 @@ Decorate arbitrary Python to make it a named run in the tree:
 @traceable(name="secure_process", tags=["production"])
 def process(user_input: str) -> dict: ...
 ```
-Used throughout section 5 to wrap non-LCEL classes (`ModelRouter.invoke`, `CachedLLM.invoke`, `SecurityGuard.check`, `InstrumentedLLM.invoke`) and in `projects/01_smart_bot_section1.py`. `run_type="chain"` and `tags=[...]` make traces filterable in the dashboard.
+- **Where it's used** — throughout section 5 to wrap non-LCEL classes (`ModelRouter.invoke`, `CachedLLM.invoke`, `SecurityGuard.check`, `InstrumentedLLM.invoke`), and in `projects/01_smart_bot_section1.py`.
+- **`run_type="chain"` and `tags=[...]`** make traces filterable in the dashboard.
 
 ### Metadata and tags
-Attach `user_id`, request type, environment, experiment version — then filter/segment in the UI. This is how you answer "which user hit the timeout" without shipping logs.
+- **What to attach** — `user_id`, request type, environment, experiment version.
+- **Why** — filter/segment in the UI; this is how you answer "which user hit the timeout" without shipping logs.
 
 ### Monitoring / metrics
-LangSmith gives you latency, error rate, and token/cost dashboards per project. `05_production_patterns/02_monitoring.py` shows the complementary self-hosted half: structured JSON logs for a log aggregator and a `MetricsCollector` computing error rate, avg latency, token totals and cache hit rate — the numbers you'd export to Prometheus/Datadog and alert on.
+- **LangSmith side** — latency, error rate, and token/cost dashboards per project.
+- **Self-hosted half** — `05_production_patterns/02_monitoring.py` shows structured JSON logs for a log aggregator, plus a `MetricsCollector` computing error rate, avg latency, token totals and cache hit rate.
+- **These are the numbers** you'd export to Prometheus/Datadog and alert on.
 
 → [`05_production_patterns/02_monitoring.py`](../05_production_patterns/02_monitoring.py)
 
 ### Cost tracking
-Traces carry token counts per call, so cost rolls up per run, per chain, per project. The application-side levers for reducing that number — complexity-based model routing, response caching, and per-request token budgets — are in `05_production_patterns/03_cost_optimization.py`, each wrapped in `@traceable` so the effect is visible in the dashboard.
+- **Where the number comes from** — traces carry token counts per call, so cost rolls up per run, per chain, per project.
+- **The application-side levers** — complexity-based model routing, response caching, and per-request token budgets.
+- **Where they live** — `05_production_patterns/03_cost_optimization.py`, each wrapped in `@traceable` so the effect is visible in the dashboard.
 
 → [`05_production_patterns/03_cost_optimization.py`](../05_production_patterns/03_cost_optimization.py)
 

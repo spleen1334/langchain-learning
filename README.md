@@ -2,9 +2,12 @@
 
 Personal working repo for the Udemy course [Production AI Agents](https://www.udemy.com/course/production-ai-agents/) (LangChain / LangGraph / LangSmith), taught progressively from fundamentals to production patterns.
 
-Scripts are demo-per-function with a `if __name__ == "__main__":` block at the bottom where most demos are commented out — uncomment the one you want and run the file.
+How the code is laid out:
 
-Files inside each topic folder are prefixed `01_`, `02_`, … reflecting **suggested reading order** — foundations first, building up. Each folder's README explains its ordering and calls out where the sequence is a real code dependency rather than just increasing difficulty. In `projects/` the numbers are course section numbers, not difficulty.
+- **Demo-per-function** — each script has an `if __name__ == "__main__":` block at the bottom where most demos are commented out; uncomment the one you want and run the file.
+- **Numeric prefixes = suggested reading order** — files inside each topic folder are prefixed `01_`, `02_`, … foundations first, building up.
+- **Per-folder READMEs** explain that ordering and call out where the sequence is a real code dependency rather than just increasing difficulty.
+- **Exception: `projects/`** — there the numbers are course section numbers, not difficulty.
 
 ## Structure
 
@@ -59,11 +62,13 @@ Start here when coming back cold — conceptual primers with links into the code
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
+**1. Install dependencies**
+
 ```bash
 uv sync                 # install dependencies from pyproject.toml / uv.lock
 ```
 
-Copy `.env.example` to `.env` and fill in real values (`.env` is gitignored — never commit it):
+**2. Configure API keys** — copy `.env.example` to `.env` and fill in real values (`.env` is gitignored — never commit it):
 
 ```bash
 cp .env.example .env
@@ -81,16 +86,16 @@ LANGSMITH_PROJECT=production-ai-agents
 
 Every script calls `load_dotenv()` at import, so the keys are picked up automatically.
 
-Verify the setup:
+**3. Verify the setup**
 
 ```bash
 uv run check_api_connection.py          # prints library versions and pings OpenAI + Anthropic
 ```
 
-Then run any demo:
+**4. Run any demo**
 
 ```bash
 uv run 02_langgraph_control_flow/05_checkpointing.py
 ```
 
-Note: a few scripts use paths relative to the repo root (e.g. `./assets/sample_docs/langchain_demo.pdf`) and write artifacts (`chroma_db/`, `research_db/`, `*.png`) into the current working directory — run them from the repo root.
+> **Run from the repo root.** A few scripts use paths relative to the repo root (e.g. `./assets/sample_docs/langchain_demo.pdf`) and write artifacts (`chroma_db/`, `research_db/`, `*.png`) into the current working directory.
