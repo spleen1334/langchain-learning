@@ -34,6 +34,7 @@ def demo_basic_chain():
 
 def demo_batch_exectution():
     """Demonstrate batch execution for multiple inputs."""
+
     prompt = ChatPromptTemplate.from_template("Translate to French: {text}")
     model = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
     parser = StrOutputParser()
@@ -50,11 +51,12 @@ def demo_batch_exectution():
     results = chain.batch(inputs)
 
     for text in zip(inputs, results):
-        print(f"Input: {text[0]['text']} => Output: {text[1]}")
+        print(f"Input: {text[0]['text']} => Output: {text[1]}\n")
 
 
 def demo_streaming():
     """Demonstrate streaming for real-time output."""
+
     prompt = ChatPromptTemplate.from_template("Write a haiku about: {topic}")
     model = ChatOpenAI(
         model="gpt-4o-mini",
@@ -75,6 +77,7 @@ def demo_streaming():
 
 def demo_schema_inspection():
     """Demonstrate input/output schema inspection."""
+
     prompt = ChatPromptTemplate.from_template("Summarize the following text: {text}")
     model = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
     parser = StrOutputParser()
@@ -122,20 +125,12 @@ def new_way():
     # class, so you can swap providers via config/env without changing imports.
     model = init_chat_model("gpt-4o-mini", temperature=0.7, max_tokens=1500)
 
-    # Or provider-specific (still works)
-
-    from langchain_anthropic import ChatAnthropic
-    from langchain_openai import ChatOpenAI
-
-    openai_model = ChatOpenAI(
-        # max_retries adds built-in exponential backoff on rate limits / transient 5xx;
-        # timeout caps a single request so a hung call can't stall the whole chain.
-        model="gpt-4o-mini", temperature=0.7, max_tokens=1500, timeout=30, max_retries=3
+    # Used instead of ChatOpenAI(....)
+    oldway = ChatOpenAI(
+        model="gpt-4o-mini", temperature=0.7, timeout=30, max_tokens=1500, max_retries=2
     )
 
-    anthropic_model = ChatAnthropic(model="claude-sonnet-4-5-20250929")
-
-    return model, openai_model, anthropic_model
+    return model, oldway
 
 
 if __name__ == "__main__":

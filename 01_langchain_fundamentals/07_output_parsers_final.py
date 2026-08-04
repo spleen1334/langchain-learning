@@ -2,7 +2,6 @@
 Output Parsers and Structured Output in LangChain V.1
 """
 
-
 from dotenv import load_dotenv
 from langchain_core.output_parsers import (
     JsonOutputParser,

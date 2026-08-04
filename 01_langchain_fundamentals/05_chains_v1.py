@@ -34,6 +34,7 @@ def demo_basic_chain():
         }
     )
     print(f"Summary: {result}  ")
+    print()
 
 
 def demo_parallel_chain():
@@ -72,6 +73,7 @@ def demo_parallel_chain():
     print(f"  Summary: {results['summary']}")
     print(f"  Keywords: {results['keywords']}")
     print(f"  Sentiment: {results['sentiment']}")
+    print()
 
 
 def demo_passthrough_chain():
@@ -84,6 +86,7 @@ def demo_passthrough_chain():
 
     # similuatee a retrieve operation
     def fake_retriever(input_dict):
+        print("Fake storing data to VectorDB...")
         return " LangChain was created by Harrison Chase in 2022."
 
     # This is the canonical RAG shape: retrieve context while forwarding the original
@@ -91,9 +94,23 @@ def demo_passthrough_chain():
     # is why x["question"] here is the whole input DICT and needs the extra ["question"]
     # unwrapping in the next step before it matches the prompt's variables.
     chain = (
+        # Both branches receive the SAME input: {"question": "Who created LangChain?"}
         RunnableParallel(
-            context=RunnableLambda(fake_retriever), question=RunnablePassthrough()
+            # context: runs fake_retriever(input_dict) -> ignores the input and returns
+            # a hardcoded string.
+            context=RunnableLambda(fake_retriever),
+            # question: RunnablePassthrough() returns its input completely unchanged,
+            # so this becomes the WHOLE input dict {"question": "..."}, not just the
+            # string. That's the nesting the next step has to undo.
+            question=RunnablePassthrough(),
         )
+        # After the block above, x looks like:
+        #   {"context": "...", "question": {"question": "Who created LangChain?"}}
+        # x["question"]["question"] unwraps the nested dict left behind by
+        # RunnablePassthrough down to the actual string, flattening x into
+        # {"context": "...", "question": "..."} so it matches the prompt's
+        # {context}/{question} template variables.
+        # THIS IS MOSTLY CLEANUP STEP
         | RunnableLambda(
             lambda x: {"context": x["context"], "question": x["question"]["question"]}
         )
@@ -104,6 +121,7 @@ def demo_passthrough_chain():
 
     result = chain.invoke({"question": "Who created LangChain?"})
     print(f"Answer: {result}")
+    print()
 
 
 def demo_chain_branching():
@@ -145,6 +163,7 @@ def demo_chain_branching():
         result = branch.invoke({"input": q})
         print(f"Q: {q}")
         print(f"A: {result[:100]}...\n")
+        print()
 
 
 def demo_debbuging():
@@ -157,7 +176,7 @@ def demo_debbuging():
 
     # with_config returns a *copy* of the chain with the config attached (it does not
     # mutate `chain`). run_name/tags are what you'll search on in the LangSmith UI.
-    # Method 2: Use with_config for tacing
+    # Method 2: Use with_config for tracing
     result = chain.with_config(
         run_name="greeting_chain",
         # tags="demo,debugging",
@@ -169,6 +188,7 @@ def demo_debbuging():
     # Returns x unchanged so it can be spliced anywhere in the pipe as a no-op probe.
     def log_step(x, step_name=""):
         print(f"[{step_name}] {type(x).__name__}: {str(x)[:100]}")
+        print()
         return x
 
     debug_chain = (
@@ -182,11 +202,12 @@ def demo_debbuging():
     print("\nDebug chain execution:")
     result = debug_chain.invoke({"name": "Debug"})
     print(f"Greeting: {result}")
+    print()
 
 
 if __name__ == "__main__":
-    # demo_basic_chain()
-    # demo_parallel_chain()
-    # demo_passthrough_chain()
-    # demo_chain_branching()
+    demo_basic_chain()
+    demo_parallel_chain()
+    demo_passthrough_chain()
+    demo_chain_branching()
     demo_debbuging()

@@ -21,7 +21,7 @@ if os.getenv("LANGSMITH_API_KEY"):
     print(f"LangSmith is configured. - Project: {os.getenv('LANGSMITH_PROJECT')}")
 
 
-# Schema Definition
+# -- Schema Definition --
 class QAResponse(BaseModel):
     answer: str = Field(description="The answer to the user's question.")
     confidence: str = Field(description="Confidence level: high, medium, or low")
@@ -37,9 +37,8 @@ class QAResponse(BaseModel):
         default=False,
     )
 
-    # Bot implementation
 
-
+# -- Bot Implementation --
 class SmartQABot:
     def __init__(
         self,
@@ -58,14 +57,14 @@ class SmartQABot:
                     "system",
                     """You are a knowledgeable Q&A assistant.
 
-Your guidelines:
-- Answer questions accurately and concisely
-- Be honest about uncertainty - set confidence to 'low' if unsure
-- Provide clear reasoning for your answers
-- Suggest relevant follow-up questions
-- Indicate if external sources would help
+                    Your guidelines:
+                    - Answer questions accurately and concisely
+                    - Be honest about uncertainty - set confidence to 'low' if unsure
+                    - Provide clear reasoning for your answers
+                    - Suggest relevant follow-up questions
+                    - Indicate if external sources would help
 
-Always respond with accurate, helpful information.""",
+                    Always respond with accurate, helpful information.""",
                 ),
                 ("human", "{question}"),
             ]
@@ -83,7 +82,7 @@ Always respond with accurate, helpful information.""",
         # API outage or a schema-validation failure becomes a low-confidence answer
         # rather than an exception leaking into the UI.
         except Exception as e:
-            # return a greaceful error response
+            # return a graceful error response
             return QAResponse(
                 answer="I'm sorry, I couldn't process your question at this time.",
                 confidence="low",
@@ -101,7 +100,7 @@ Always respond with accurate, helpful information.""",
         return self.chain.batch(inputs)
 
 
-# Demo Usage
+# -- Demo Usage --
 def demo_qa_bot():
     bot = SmartQABot()
 
@@ -116,7 +115,6 @@ def demo_qa_bot():
     print("=" * 60)
 
     for question in questions:
-
         print(f"\n Question: {question}")
         print("-" * 40)
 
@@ -133,19 +131,18 @@ def demo_qa_bot():
 
 @traceable(name="error_handling_demo", run_type="chain")
 def demo_error_handling():
-    """Demonstrate error handling."""
+    """Demonstrate error handling by forcing ask()'s except branch: an invalid
+    model name makes self.chain.invoke() raise deterministically, every run."""
 
-    bot = SmartQABot()
+    bot = SmartQABot(model_name="gpt-4o-mini-does-not-exist")
 
     print("\n" + "=" * 60)
     print("ERROR HANDLING DEMO")
     print("=" * 60)
 
-    # Test with a very long question (edge case)
-    long_question = "What is " + "very " * 100 + "important?"
-
-    response = bot.ask(long_question)
+    response = bot.ask("What is the capital of France?")
     print(f"Handled gracefully: {response.confidence}")
+    print(f"Reasoning: {response.reasoning}")
 
 
 @traceable(name="batch_demo", run_type="chain")
@@ -173,17 +170,15 @@ def demo_batch_processing():
 
 
 if __name__ == "__main__":
+    demo_qa_bot()
+    demo_batch_processing()
+    demo_error_handling()
 
-    try:
-        demo_qa_bot()
-        demo_batch_processing()
-        demo_error_handling()
-
-        print("\n" + "=" * 60)
-        print("Section 1 Complete!")
-        print("=" * 60)
-        print(
-            """
+    print("\n" + "=" * 60)
+    print("Section 1 Complete!")
+    print("=" * 60)
+    print(
+        """
 What you learned:
 - LangChain ecosystem overview
 - Environment setup with uv
@@ -196,8 +191,8 @@ What you learned:
 
 Next: Section 2 - Chains, RAG & Memory
         """
-        )
-    finally:
-        pass
-    # uncomment the line below to flush traces to LangSmith, but you'll alse see an error at the end of a run, which is not harmful at all, but annoying!
-    # Client().flush()  # Ensure all traces are sent to LangSmith
+    )
+
+    # Uncomment to flush traces to LangSmith before exit. You'll also see a
+    # harmless-but-annoying error printed at the end of the run when you do.
+    # Client().flush()

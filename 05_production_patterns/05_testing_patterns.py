@@ -549,6 +549,14 @@ def run_comparison(dataset_name: str):
 # ============================================================
 
 if __name__ == "__main__":
+    test_qa_chain_with_mock()
+    print("All tests passed!")
+    test_qa_chain_handles_empty_response()
+    print("All tests passed!")
+    demo_integration_tests()
+    demo_evaluation()
+    demo_regression_testing()
+
     print("=" * 60)
     print("LangSmith Evaluation Datasets Demo")
     print("=" * 60)
@@ -571,13 +579,3 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("All experiments logged to LangSmith!")
     print("=" * 60)
-
-
-# if __name__ == "__main__":
-# test_qa_chain_with_mock()
-# print("All tests passed!")
-# test_qa_chain_handles_empty_response()
-# print("All tests passed!")
-# demo_integration_tests()
-# demo_evaluation()
-# demo_regression_testing()

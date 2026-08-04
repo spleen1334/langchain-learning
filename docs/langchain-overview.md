@@ -34,6 +34,12 @@ LCEL (LangChain Expression Language) is the `|` operator composing Runnables int
 chain = prompt | model | parser
 ```
 
+> [!IMPORTANT]
+> Pipe order is not arbitrary — each `Runnable`'s output must match the next one's expected input.
+> `prompt` emits a `PromptValue`, `model` consumes a `PromptValue` and emits an `AIMessage`, `parser`
+> consumes that message and emits `str`. Reordering (e.g. `model | prompt | parser`) breaks the chain
+> at runtime because the types no longer line up.
+
 Composition helpers beyond the pipe:
 - `RunnableParallel(a=..., b=...)` — run branches concurrently, return a dict
 - `RunnablePassthrough()` — forward the input untouched (used to thread the raw question past a retriever)
