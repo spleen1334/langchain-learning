@@ -110,7 +110,8 @@ def chunk_size_comparison():
     print("=== Chunk Size Comparison ===")
     for size in sizes:
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=size, chunk_overlap=size // 5
+            chunk_size=size,
+            chunk_overlap=size // 5,
             # ~10-20% of chunk_size is the usual rule of thumb: enough to keep a sentence
             # that straddles a boundary intact, without duplicating too much stored text.
         )  # 20% overlap

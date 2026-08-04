@@ -68,7 +68,7 @@ def chroma_basics():
         print(f"Top 2 results for query '{query}':")
         for i, doc in enumerate(results):
             print(
-                f"Result {i+1}: {doc.page_content} (Source: {doc.metadata['source']})"
+                f"Result {i + 1}: {doc.page_content} (Source: {doc.metadata['source']})"
             )
 
 
@@ -90,7 +90,7 @@ def similarity_search_with_scores():
             # The scale is store-specific — don't hardcode thresholds across backends.
             final_score = 1 / (1 + score)  # Convert distance to similarity
             print(
-                f"Result {i+1}: {doc.page_content} (Score: {final_score:.4f}, Source: {doc.metadata['source']})"
+                f"Result {i + 1}: {doc.page_content} (Score: {final_score:.4f}, Source: {doc.metadata['source']})"
             )
 
 
@@ -108,7 +108,7 @@ def metadata_filtering():
         print(f"Results without metadata filtering for query '{query}':")
         for i, doc in enumerate(results):
             print(
-                f"Result {i+1}: {doc.page_content} (Source: {doc.metadata['source']})"
+                f"Result {i + 1}: {doc.page_content} (Source: {doc.metadata['source']})"
             )
 
         # with metadata filtering
@@ -122,12 +122,11 @@ def metadata_filtering():
         print(f"\nResults with metadata filtering for query '{query}':")
         for i, doc in enumerate(filtered_results):
             print(
-                f"Result {i+1}: {doc.page_content} (Source: {doc.metadata['source']})"
+                f"Result {i + 1}: {doc.page_content} (Source: {doc.metadata['source']})"
             )
 
 
 def as_retriever():
-
     with tempfile.TemporaryDirectory() as tmpdir:
         vectorstore = Chroma.from_documents(
             documents=SAMPLE_DOCS,
@@ -138,6 +137,9 @@ def as_retriever():
         # basic retriever usage
         # as_retriever wraps the store in a Runnable so it can be piped into an LCEL
         # chain; .invoke(str) -> list[Document] is the interface RAG chains expect.
+        #
+        # it uses the same type of search as similarity_search, but can be instead used
+        # in langchain chains (as it is Runnable)
         retriever = vectorstore.as_retriever(
             search_type="similarity", search_kwargs={"k": 3}
         )
@@ -147,7 +149,7 @@ def as_retriever():
         print("Retriever results:")
         for i, doc in enumerate(docs):
             print(
-                f"Result {i+1}: {doc.page_content} (Source: {doc.metadata['source']})"
+                f"Result {i + 1}: {doc.page_content} (Source: {doc.metadata['source']})"
             )
 
         # MMR (Maximal Marginal Relevance) pulls fetch_k candidates, then greedily picks
@@ -161,7 +163,7 @@ def as_retriever():
         print("\nMMR Retriever results:")
         for i, doc in enumerate(mmr_docs):
             print(
-                f"Result {i+1}: {doc.page_content} (Source: {doc.metadata['source']})"
+                f"Result {i + 1}: {doc.page_content} (Source: {doc.metadata['source']})"
             )
 
 
@@ -268,9 +270,9 @@ def exercise_vector_store_setup():
 
 
 if __name__ == "__main__":
-    # chroma_basics()
-    # similarity_search_with_scores()
-    # metadata_filtering()
-    # as_retriever()
-    # persist_chroma()
+    chroma_basics()
+    similarity_search_with_scores()
+    metadata_filtering()
+    as_retriever()
+    persist_chroma()
     exercise_vector_store_setup()

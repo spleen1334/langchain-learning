@@ -34,10 +34,13 @@ def load_text_file():
         print(f"Metadata: {documents[0].metadata}")
 
         # Print the loaded documents
-        # for doc in documents:
-        #     print("Document Content:")
-        #     print(doc)
-        #     print(doc.page_content)
+        for doc in documents:
+            print("Document Content:")
+            print(doc)
+            print(doc.page_content)
+
+        print()
+
     finally:
         # Clean up the temporary file
         os.remove(temp_file_path)
@@ -53,6 +56,7 @@ def web_loader():
     print(f"Source: {documents[0].metadata.get('source', 'N/A')}")
     print(f"Content length: {len(documents[0].page_content)} characters")
     print(f"Preview: {documents[0].page_content[:200]}...")
+    print()
 
 
 def lazy_loader():
@@ -67,11 +71,13 @@ def lazy_loader():
         loader = DirectoryLoader(tmpdir, glob="*.txt", loader_cls=TextLoader)
 
         print("Initialized lazy loader for directory:", tmpdir)
+        # useful for very large files
         # lazy_load() yields documents one at a time instead of building the whole list
         # like .load() — the difference matters when a directory won't fit in memory.
         for doc in loader.lazy_load():
             print("Document Content Preview:", doc.page_content[:50], "...")
             print("Metadata:", doc.metadata["source"])
+            print()
 
 
 def doc_structure():
@@ -90,6 +96,7 @@ def doc_structure():
     print(f"  page_content (type): {type(doc.page_content)}")
     print(f"  page_content: {doc.page_content}")
     print(f"  metadata: {doc.metadata}")
+    print()
 
 
 def pdf_loader(pdf_path: str):
@@ -100,13 +107,14 @@ def pdf_loader(pdf_path: str):
 
     print(f"Loaded {len(documents)} document(s) from PDF")
     for i, doc in enumerate(documents):
-        print(f"Document {i+1} Content Preview: {doc.page_content[:100]}...")
+        print(f"Document {i + 1} Content Preview: {doc.page_content[:100]}...")
         print(f"Metadata: {doc.metadata}")
+        print()
 
 
 if __name__ == "__main__":
-    # load_text_file()
-    # web_loader()
-    # lazy_loader()
-    # doc_structure()
+    load_text_file()
+    web_loader()
+    lazy_loader()
+    doc_structure()
     pdf_loader("./assets/sample_docs/langchain_demo.pdf")

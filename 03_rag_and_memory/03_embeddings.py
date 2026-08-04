@@ -4,7 +4,7 @@
 # text-embedding-ada-002    1536        $0.10                Legacy
 
 from dotenv import load_dotenv
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 
