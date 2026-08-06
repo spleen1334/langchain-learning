@@ -12,6 +12,6 @@ with open("graph.png", "wb") as f:
 
 Notes:
 - **Reference pictures only** — nothing imports them.
-- **From `02_langgraph_control_flow/`** — simple graphs, accumulating state, multi-node pipelines, conditional routing, quality loops, self-correcting code generation.
+- **From `03_langgraph_control_flow/`** — simple graphs, accumulating state, multi-node pipelines, conditional routing, quality loops, self-correcting code generation.
 - **From `projects/multi_agent_research_system.py`** — `research_graph.png`.
 - **Output location** — scripts write these files to the current working directory, so re-running a demo drops a new PNG at the repo root; move it here.

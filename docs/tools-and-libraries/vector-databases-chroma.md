@@ -4,7 +4,7 @@
 
 Chroma is an **open-source embedding database (vector store)**: it stores embedding vectors alongside their source text and metadata, and lets you query by semantic similarity instead of exact match. Under the hood a similarity search is a nearest-neighbor lookup over vectors — Chroma indexes them so that lookup stays fast as the collection grows.
 
-It's used in this course as the vector store behind RAG pipelines: documents get embedded (see `pydantic-overview.md`'s neighbor, the embeddings scripts in `03_rag_and_memory/`), stored in Chroma, and retrieved by similarity to a query at answer time.
+It's used in this course as the vector store behind RAG pipelines: documents get embedded (see `pydantic-overview.md`'s neighbor, the embeddings scripts in `02_rag_and_memory/`), stored in Chroma, and retrieved by similarity to a query at answer time.
 
 ## Core concepts
 
@@ -105,6 +105,6 @@ See `vector-databases-overview.md` for the full field (Qdrant, Pinecone, Weaviat
 Chroma trades the production-scale muscle of Qdrant/Weaviate/Pinecone and the raw speed of FAISS for near-zero setup and ops — which is exactly why it's the right default for this course's RAG examples, and a reasonable choice for real small-to-mid projects. Migrating off it later is cheap because of LangChain's shared `VectorStore` interface, so starting here isn't a trap.
 
 ## Where it's used in this repo
-- `03_rag_and_memory/05_vector_stores.py` — Chroma basics, scored search, metadata filtering, `as_retriever`, MMR, and persistence, one function per concept.
-- `03_rag_and_memory/06_rag_pipeline.py`, `03_rag_and_memory/07_advanced_rag.py` — Chroma wired into full RAG chains (multi-query, parent-document, hybrid retrieval).
+- `02_rag_and_memory/05_vector_stores.py` — Chroma basics, scored search, metadata filtering, `as_retriever`, MMR, and persistence, one function per concept.
+- `02_rag_and_memory/06_rag_pipeline.py`, `02_rag_and_memory/07_advanced_rag.py` — Chroma wired into full RAG chains (multi-query, parent-document, hybrid retrieval).
 - `projects/02_research_assistant.py` — a persisted Chroma store (`./research_db`) as the backing knowledge base for a longer-lived assistant.

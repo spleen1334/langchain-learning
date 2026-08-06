@@ -19,7 +19,7 @@ LANGSMITH_PROJECT=My Project        # optional, groups runs
 ```
 
 - **That's it** — any LCEL chain or compiled graph invoked afterwards is traced.
-- **To turn it off** — set `LANGSMITH_TRACING=false`; `02_langgraph_control_flow/01_langgraph_core.py` has a note about toggling it per-demo.
+- **To turn it off** — set `LANGSMITH_TRACING=false`; `03_langgraph_control_flow/01_langgraph_core.py` has a note about toggling it per-demo.
 
 → [`05_production_patterns/01_langsmith_setup.py`](../05_production_patterns/01_langsmith_setup.py)
 
@@ -89,4 +89,4 @@ LLM output isn't `assert ==`-testable, so use layers:
 | Mocks, integration tests, LLM-as-judge, datasets, `evaluate()`, experiment comparison | `05_production_patterns/05_testing_patterns.py` |
 | Security pipeline steps as traced runs | `05_production_patterns/04_security_patterns.py` |
 | Project-level tracing setup from env | `projects/01_smart_bot_section1.py` |
-| Traced fallback chain | `02_langgraph_control_flow/07_error_handling.py` |
+| Traced fallback chain | `03_langgraph_control_flow/07_error_handling.py` |

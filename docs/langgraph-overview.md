@@ -32,7 +32,7 @@ class State(TypedDict):
 - **`add_messages`** (from `langgraph.graph`) is the one to reach for with chat state: it appends, and handles message IDs/updates rather than blindly concatenating.
 - **Reducers make parallel branches safe** — two nodes writing the same key concurrently would otherwise conflict.
 
-→ [`02_langgraph_control_flow/01_langgraph_core.py`](../02_langgraph_control_flow/01_langgraph_core.py)
+→ [`03_langgraph_control_flow/01_langgraph_core.py`](../03_langgraph_control_flow/01_langgraph_core.py)
 
 ### Nodes and edges
 ```python
@@ -47,7 +47,7 @@ app = graph.compile()
 - **Multiple edges out of one node** = parallel fan-out.
 - **Multiple edges into one node** = fan-in; that node waits for all of them.
 
-→ [`02_langgraph_control_flow/02_first_graph.py`](../02_langgraph_control_flow/02_first_graph.py), [`04_multi_agent_systems/04_parallel_agents.py`](../04_multi_agent_systems/04_parallel_agents.py)
+→ [`03_langgraph_control_flow/02_first_graph.py`](../03_langgraph_control_flow/02_first_graph.py), [`04_multi_agent_systems/04_parallel_agents.py`](../04_multi_agent_systems/04_parallel_agents.py)
 
 ### Conditional edges
 ```python
@@ -57,14 +57,14 @@ graph.add_conditional_edges("source", router, {"a": "node_a", "b": "node_b"})
 - **The router is plain Python** — it can read state set by an LLM classifier node, or call an LLM itself.
 - **Pair it with `with_structured_output(SomeLiteralSchema)`** — the reliable way to get an LLM to choose a branch.
 
-→ [`02_langgraph_control_flow/03_conditional_edges.py`](../02_langgraph_control_flow/03_conditional_edges.py)
+→ [`03_langgraph_control_flow/03_conditional_edges.py`](../03_langgraph_control_flow/03_conditional_edges.py)
 
 ### Cycles
 - **An edge pointing backwards makes a loop** — `generate → validate → (conditional) → generate`.
 - **Always carry an `iteration` counter in state** and terminate on `iteration >= max` in the router — nothing else stops an infinite loop.
 - **Backstop** — LangGraph also enforces a global recursion limit.
 
-→ [`02_langgraph_control_flow/04_cycles_loops.py`](../02_langgraph_control_flow/04_cycles_loops.py)
+→ [`03_langgraph_control_flow/04_cycles_loops.py`](../03_langgraph_control_flow/04_cycles_loops.py)
 
 ### The Send API (dynamic fan-out)
 - **When to use** — the number of parallel branches is only known at runtime.
@@ -107,7 +107,7 @@ Useful operations:
 - `app.update_state(config, {...})` — write into state from outside the graph
 - passing a `checkpoint_id` in config — resume/rewind to an exact point
 
-→ [`02_langgraph_control_flow/05_checkpointing.py`](../02_langgraph_control_flow/05_checkpointing.py)
+→ [`03_langgraph_control_flow/05_checkpointing.py`](../03_langgraph_control_flow/05_checkpointing.py)
 
 ### Human-in-the-loop
 Interrupts are checkpointing plus a pause:
@@ -122,7 +122,7 @@ app.invoke(None, config)                 # None = resume from checkpoint
 - **`interrupt_after=[...]`** also exists.
 - **Put the interrupt inside a cycle** and it fires on every iteration — that's a review loop.
 
-→ [`02_langgraph_control_flow/06_human_in_loop.py`](../02_langgraph_control_flow/06_human_in_loop.py)
+→ [`03_langgraph_control_flow/06_human_in_loop.py`](../03_langgraph_control_flow/06_human_in_loop.py)
 
 ### Tool execution
 - **`ToolNode(tools)`** from `langgraph.prebuilt` executes whatever the model requested in `AIMessage.tool_calls` and appends `ToolMessage`s.
@@ -146,19 +146,19 @@ app.invoke(None, config)                 # None = resume from checkpoint
 - **The repo's approach** — catch inside the node, write an `error` / `retry_count` into state, and let a conditional edge choose retry vs fallback vs give-up.
 - **Around external calls** — wrap them in retry decorators, circuit breakers, or model fallback chains.
 
-→ [`02_langgraph_control_flow/07_error_handling.py`](../02_langgraph_control_flow/07_error_handling.py)
+→ [`03_langgraph_control_flow/07_error_handling.py`](../03_langgraph_control_flow/07_error_handling.py)
 
 ## Where each concept lives
 
 | Concept | File |
 |---|---|
-| StateGraph, nodes, edges, reducers, mermaid export | `02_langgraph_control_flow/01_langgraph_core.py` |
-| Minimal two-node stateful graph | `02_langgraph_control_flow/02_first_graph.py` |
-| Conditional edges / routing | `02_langgraph_control_flow/03_conditional_edges.py` |
-| Cycles, self-correction, iteration caps | `02_langgraph_control_flow/04_cycles_loops.py` |
-| Checkpointers, state inspection, time travel, branching threads | `02_langgraph_control_flow/05_checkpointing.py` |
-| `interrupt_before`, `update_state`, `invoke(None)` | `02_langgraph_control_flow/06_human_in_loop.py` |
-| Retry / circuit breaker / fallback / in-graph error routing | `02_langgraph_control_flow/07_error_handling.py` |
+| StateGraph, nodes, edges, reducers, mermaid export | `03_langgraph_control_flow/01_langgraph_core.py` |
+| Minimal two-node stateful graph | `03_langgraph_control_flow/02_first_graph.py` |
+| Conditional edges / routing | `03_langgraph_control_flow/03_conditional_edges.py` |
+| Cycles, self-correction, iteration caps | `03_langgraph_control_flow/04_cycles_loops.py` |
+| Checkpointers, state inspection, time travel, branching threads | `03_langgraph_control_flow/05_checkpointing.py` |
+| `interrupt_before`, `update_state`, `invoke(None)` | `03_langgraph_control_flow/06_human_in_loop.py` |
+| Retry / circuit breaker / fallback / in-graph error routing | `03_langgraph_control_flow/07_error_handling.py` |
 | `ToolNode`, agent loop | `04_multi_agent_systems/01_tool_calling_agent.py` |
 | Subgraphs, parallel fan-out/fan-in | `04_multi_agent_systems/07_hierarchical_agents.py`, `04_parallel_agents.py` |
 | Send API, streaming, quality-gate loop | `projects/03_multi_agent_research_system.py` |

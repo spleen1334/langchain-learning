@@ -23,7 +23,7 @@ When to reach for it:
 - **Use it when** your flow is essentially a **directed pipeline**: input goes in, passes through a fixed set of steps, answer comes out — RAG chains, extraction pipelines, classification chains.
 - **What it does *not* give you** — state that persists across steps, loops, or branching that can revisit an earlier step. That's the moment you graduate to LangGraph.
 
-→ [langchain-overview.md](langchain-overview.md) · code: [`01_langchain_fundamentals/`](../01_langchain_fundamentals/), [`03_rag_and_memory/`](../03_rag_and_memory/)
+→ [langchain-overview.md](langchain-overview.md) · code: [`01_langchain_fundamentals/`](../01_langchain_fundamentals/), [`02_rag_and_memory/`](../02_rag_and_memory/)
 
 ## LangGraph
 
@@ -35,7 +35,7 @@ The **orchestration** framework, and the thing that makes an "agent" rather than
 - **Checkpointers** (`MemorySaver`, `SqliteSaver`) — persist state per `thread_id`, which in turn unlocks multi-turn memory, time-travel debugging, and human-in-the-loop interrupts.
 - **Multi-agent systems** (supervisor, hierarchical subgraphs, parallel fan-out, handoffs) are all just LangGraph topologies.
 
-→ [langgraph-overview.md](langgraph-overview.md), [multi-agent-overview.md](multi-agent-overview.md) · code: [`02_langgraph_control_flow/`](../02_langgraph_control_flow/), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
+→ [langgraph-overview.md](langgraph-overview.md), [multi-agent-overview.md](multi-agent-overview.md) · code: [`03_langgraph_control_flow/`](../03_langgraph_control_flow/), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
 
 ## LangSmith
 
@@ -77,7 +77,7 @@ A useful rule of thumb for which layer you need:
 
 And regardless of which you pick, LangSmith sits on top watching it.
 
-→ code: [`02_langgraph_control_flow/03_conditional_edges.py`](../02_langgraph_control_flow/03_conditional_edges.py), [`02_langgraph_control_flow/04_cycles_loops.py`](../02_langgraph_control_flow/04_cycles_loops.py), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
+→ code: [`03_langgraph_control_flow/03_conditional_edges.py`](../03_langgraph_control_flow/03_conditional_edges.py), [`03_langgraph_control_flow/04_cycles_loops.py`](../03_langgraph_control_flow/04_cycles_loops.py), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
 
 ---
 

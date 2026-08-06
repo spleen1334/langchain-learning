@@ -29,7 +29,7 @@ Indexing (load/split/embed/store) happens offline; retrieval and generation happ
 
 **Metadata is a load-time decision.** Put whatever you'll want to filter on into `metadata` at load time; retrofitting it later means re-indexing.
 
-→ [`03_rag_and_memory/01_document_loaders.py`](../03_rag_and_memory/01_document_loaders.py)
+→ [`02_rag_and_memory/01_document_loaders.py`](../02_rag_and_memory/01_document_loaders.py)
 
 ### 2. Split
 Chunking is the highest-leverage knob in the whole pipeline:
@@ -45,7 +45,7 @@ Tools:
 - `RecursiveCharacterTextSplitter.from_language(Language.PYTHON)` — code-aware boundaries (functions/classes).
 - `split_documents(docs)` (vs `split_text`) keeps metadata on every chunk.
 
-→ [`03_rag_and_memory/02_text_splitters.py`](../03_rag_and_memory/02_text_splitters.py)
+→ [`02_rag_and_memory/02_text_splitters.py`](../02_rag_and_memory/02_text_splitters.py)
 
 ### 3. Embed
 An embedding maps text to a fixed-length vector where semantic similarity ≈ cosine similarity.
@@ -62,7 +62,7 @@ Model choice:
 
 Caching: `CacheBackedEmbeddings.from_bytes_store(underlying, store, namespace=...)` avoids re-paying for unchanged documents on re-index.
 
-→ [`03_rag_and_memory/03_embeddings.py`](../03_rag_and_memory/03_embeddings.py), [`04_embeddings_deep.py`](../03_rag_and_memory/04_embeddings_deep.py)
+→ [`02_rag_and_memory/03_embeddings.py`](../02_rag_and_memory/03_embeddings.py), [`04_embeddings_deep.py`](../02_rag_and_memory/04_embeddings_deep.py)
 
 ### 4. Store
 Vector stores index vectors for approximate nearest-neighbour search.
@@ -78,7 +78,7 @@ Key operations:
 
 **MMR** (Maximal Marginal Relevance) fetches `fetch_k` then selects `k` that are relevant *and* mutually diverse — the fix for "top 5 results are five copies of the same paragraph".
 
-→ [`03_rag_and_memory/05_vector_stores.py`](../03_rag_and_memory/05_vector_stores.py)
+→ [`02_rag_and_memory/05_vector_stores.py`](../02_rag_and_memory/05_vector_stores.py)
 
 ### 5. Retrieve + generate
 The canonical LCEL RAG chain:
@@ -97,7 +97,7 @@ Prompt discipline matters as much as retrieval:
 - An explicit refusal instruction ("if the answer is not in the context, say …") — the fallback that stops hallucination on out-of-scope questions
 - `with_structured_output(RAGResponse)` for answer + confidence + sources + follow-ups when downstream code needs to branch on confidence
 
-→ [`03_rag_and_memory/06_rag_pipeline.py`](../03_rag_and_memory/06_rag_pipeline.py)
+→ [`02_rag_and_memory/06_rag_pipeline.py`](../02_rag_and_memory/06_rag_pipeline.py)
 
 ## Advanced retrieval
 
@@ -114,7 +114,7 @@ Plain top-k similarity fails in predictable ways; each strategy targets one fail
 - **They compose** — the repo's advanced chain stacks multi-query under compression.
 - **But they aren't free** — each layer costs extra LLM calls and latency; measure before adopting.
 
-→ [`03_rag_and_memory/07_advanced_rag.py`](../03_rag_and_memory/07_advanced_rag.py)
+→ [`02_rag_and_memory/07_advanced_rag.py`](../02_rag_and_memory/07_advanced_rag.py)
 
 ## Memory (the conversational half)
 
@@ -131,18 +131,18 @@ Note on follow-ups:
 - Questions like "how does the second component work?" need history *before* retrieval to be resolvable.
 - The research assistant handles this by passing history into the prompt alongside retrieved context.
 
-→ [`03_rag_and_memory/08_conversation_memory.py`](../03_rag_and_memory/08_conversation_memory.py)
+→ [`02_rag_and_memory/08_conversation_memory.py`](../02_rag_and_memory/08_conversation_memory.py)
 
 ## Where each concept lives
 
 | Concept | File |
 |---|---|
-| Loaders, `Document`, lazy loading | `03_rag_and_memory/01_document_loaders.py` |
-| Chunk size/overlap, markdown & code splitting | `03_rag_and_memory/02_text_splitters.py` |
-| Embedding providers and dimensions | `03_rag_and_memory/03_embeddings.py` |
-| Cosine similarity, vector inspection, embedding cache | `03_rag_and_memory/04_embeddings_deep.py` |
-| Chroma, scores, metadata filters, MMR, persistence | `03_rag_and_memory/05_vector_stores.py` |
-| RAG chain, citations, refusal fallback, structured RAG | `03_rag_and_memory/06_rag_pipeline.py` |
-| Multi-query, compression, BM25 hybrid, parent-document | `03_rag_and_memory/07_advanced_rag.py` |
-| All memory strategies | `03_rag_and_memory/08_conversation_memory.py` |
+| Loaders, `Document`, lazy loading | `02_rag_and_memory/01_document_loaders.py` |
+| Chunk size/overlap, markdown & code splitting | `02_rag_and_memory/02_text_splitters.py` |
+| Embedding providers and dimensions | `02_rag_and_memory/03_embeddings.py` |
+| Cosine similarity, vector inspection, embedding cache | `02_rag_and_memory/04_embeddings_deep.py` |
+| Chroma, scores, metadata filters, MMR, persistence | `02_rag_and_memory/05_vector_stores.py` |
+| RAG chain, citations, refusal fallback, structured RAG | `02_rag_and_memory/06_rag_pipeline.py` |
+| Multi-query, compression, BM25 hybrid, parent-document | `02_rag_and_memory/07_advanced_rag.py` |
+| All memory strategies | `02_rag_and_memory/08_conversation_memory.py` |
 | Full application combining RAG + memory + structured output | `projects/02_research_assistant.py` |

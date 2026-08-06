@@ -107,8 +107,8 @@ See [rag-overview.md](rag-overview.md).
 | Message types, few-shot, prompt composition | `01_langchain_fundamentals/03_prompt_messages.py`, `04_prompt_templates_all.py` |
 | Parallel / passthrough / branch / debugging | `01_langchain_fundamentals/05_chains_v1.py` |
 | Parsers + `with_structured_output` | `01_langchain_fundamentals/06_output_parsers_demo.py`, `07_output_parsers_final.py` |
-| Memory (`RunnableWithMessageHistory`, trimming, summary) | `03_rag_and_memory/08_conversation_memory.py` |
-| Full RAG chain | `03_rag_and_memory/06_rag_pipeline.py` |
+| Memory (`RunnableWithMessageHistory`, trimming, summary) | `02_rag_and_memory/08_conversation_memory.py` |
+| Full RAG chain | `02_rag_and_memory/06_rag_pipeline.py` |
 | Capstone using all of it | `projects/01_smart_bot_section1.py`, `projects/02_research_assistant.py` |
 
 ## When LangChain stops being enough

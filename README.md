@@ -16,10 +16,10 @@ How the code is laid out:
 ├── 01_langchain_fundamentals/   LCEL, runnables, prompts, models, output parsers
 │     01_core_concepts · 02_working_with_llms · 03_prompt_messages · 04_prompt_templates_all
 │     05_chains_v1 · 06_output_parsers_demo · 07_output_parsers_final
-├── 02_langgraph_control_flow/   StateGraph, routing, cycles, checkpointing, HITL, errors
+├── 03_langgraph_control_flow/   StateGraph, routing, cycles, checkpointing, HITL, errors
 │     01_langgraph_core · 02_first_graph · 03_conditional_edges · 04_cycles_loops
 │     05_checkpointing · 06_human_in_loop · 07_error_handling
-├── 03_rag_and_memory/           loaders, splitters, embeddings, vector stores, RAG, memory
+├── 02_rag_and_memory/           loaders, splitters, embeddings, vector stores, RAG, memory
 │     01_document_loaders · 02_text_splitters · 03_embeddings · 04_embeddings_deep
 │     05_vector_stores · 06_rag_pipeline · 07_advanced_rag · 08_conversation_memory
 ├── 04_multi_agent_systems/      tools, supervisor, hierarchy, parallel, handoffs, comms
@@ -40,8 +40,8 @@ How the code is laid out:
 ## Folder guides
 
 - [01 — LangChain Fundamentals](01_langchain_fundamentals/README.md)
-- [02 — LangGraph Control Flow](02_langgraph_control_flow/README.md)
-- [03 — RAG and Memory](03_rag_and_memory/README.md)
+- [02 — LangGraph Control Flow](03_langgraph_control_flow/README.md)
+- [03 — RAG and Memory](02_rag_and_memory/README.md)
 - [04 — Multi-Agent Systems](04_multi_agent_systems/README.md)
 - [05 — Production Patterns](05_production_patterns/README.md)
 - [Projects (section capstones)](projects/README.md)
@@ -95,7 +95,7 @@ uv run check_api_connection.py          # prints library versions and pings Open
 **4. Run any demo**
 
 ```bash
-uv run 02_langgraph_control_flow/05_checkpointing.py
+uv run 03_langgraph_control_flow/05_checkpointing.py
 ```
 
 > **Run from the repo root.** A few scripts use paths relative to the repo root (e.g. `./assets/sample_docs/langchain_demo.pdf`) and write artifacts (`chroma_db/`, `research_db/`, `*.png`) into the current working directory.
