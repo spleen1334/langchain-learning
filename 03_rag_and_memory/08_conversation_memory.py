@@ -3,7 +3,6 @@ Conversation Memory in LangChain
 Modern approaches to maintaining conversation context
 """
 
-
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.chat_history import (
@@ -35,9 +34,9 @@ def demo_basic_memory():
     print("Using RunnableWithMessageHistory (modern approach)")
     print("=" * 60)
 
-    # llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)
-
     # Prompt with history placeholder
+    # MessagesPlaceholder splices in a variable-length list of message objects (the
+    # growing history); "{input}" is a plain string slot for exactly one human turn.
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "You are a helpful assistant. Be concise."),
@@ -630,6 +629,6 @@ if __name__ == "__main__":
     # demo_multi_sessions()
     # demo_message_trimming()
     # demo_windowed_memory()
-    # demo_summary_memory()
+    demo_summary_memory()
     # exercise_persistent_memory()
-    exercise_persistent_memory_proof()
+    # exercise_persistent_memory_proof()

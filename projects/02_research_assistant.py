@@ -7,6 +7,10 @@ from datetime import UTC, datetime
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
+from langchain_classic.retrievers import (
+    ContextualCompressionRetriever,
+)
+from langchain_classic.retrievers.document_compressors import LLMChainExtractor
 from langchain_classic.retrievers.multi_query import MultiQueryRetriever
 from langchain_core.chat_history import (
     BaseChatMessageHistory,
@@ -32,11 +36,11 @@ class ResearchResponse(BaseModel):
     answer: str = Field(description="The answer to the question")
     confidence: str = Field(description="high, medium, or low based on source quality")
     sources: list[str] = Field(description="List of source documents used")
-    # default=[] is safe HERE only because Pydantic deep-copies defaults per instance —
-    # the same line in a dataclass or a plain function signature would be the classic
-    # shared-mutable-default bug. default_factory=list states the intent more clearly.
+    # default=[] would be safe here too, since Pydantic deep-copies defaults per instance --
+    # but default_factory=list is the idiomatic way to spell "empty list" and avoids relying
+    # on that deep-copy behavior.
     key_quotes: list[str] = Field(
-        description="Relevant quotes from sources", default=[]
+        description="Relevant quotes from sources", default_factory=list
     )
     follow_up_questions: list[str] = Field(description="Suggested follow-up questions")
 
@@ -44,8 +48,6 @@ class ResearchResponse(BaseModel):
 # ============================================================
 # Research Assistant Class
 # ============================================================
-
-
 class AIResearchAssistant:
     """AI Research Assistant with document ingestion and retrieval."""
 
@@ -87,7 +89,7 @@ class AIResearchAssistant:
 
         print("Research Assistant initialized")
         print(f"  Vector store: {persist_directory}")
-        print(f"  Documents indexed: {self.vectorstore._collection.count()}")
+        print(f"  Documents indexed: {len(self.vectorstore.get()['ids'])}")
 
     def add_documents(
         self,
@@ -130,18 +132,19 @@ class AIResearchAssistant:
 
     def get_document_count(self) -> int:
         """Get total number of indexed chunks."""
-        return self.vectorstore._collection.count()
+        return len(self.vectorstore.get()["ids"])
 
     def list_sources(self) -> list[str]:
         """List all unique sources in the database."""
-        results = self.vectorstore._collection.get()
+        # include=["metadatas"] skips fetching document text and embeddings we don't use.
+        results = self.vectorstore.get(include=["metadatas"])
         sources = set()
         for metadata in results.get("metadatas", []):
             if metadata and "source" in metadata:
                 sources.add(metadata["source"])
         return sorted(sources)
 
-    def _build_retriever(self, use_advanced: bool = False):
+    def _build_retriever(self, use_advanced: bool = False, compression: bool = True):
         """Build retriever -- basic or advanced"""
 
         # Base: simple similarity search
@@ -161,6 +164,19 @@ class AIResearchAssistant:
             llm=self.llm,
         )
 
+        # Contextual compression: after multi-query retrieves its chunks, an LLM re-reads
+        # each one against the question and extracts only the relevant sentences (or drops
+        # the chunk entirely if nothing is relevant). This shrinks what gets sent to the
+        # final answering LLM, at the cost of one extra LLM call per retrieved chunk --
+        # a good trade when chunks are large and mostly irrelevant, wasteful for small,
+        # already-focused chunks.
+        if compression:
+            compressor = LLMChainExtractor.from_llm(self.llm)
+            advanced_retriever = ContextualCompressionRetriever(
+                base_compressor=compressor, base_retriever=multi_retriever
+            )
+            return advanced_retriever
+
         return multi_retriever
 
     def _format_docs_for_context(self, docs) -> str:
@@ -171,7 +187,7 @@ class AIResearchAssistant:
         formatted = []
         for i, doc in enumerate(docs):
             source = doc.metadata.get("source", "Unknown")
-            formatted.append(f"[Source {i+1}: {source}]\n{doc.page_content}")
+            formatted.append(f"[Source {i + 1}: {source}]\n{doc.page_content}")
         return "\n\n---\n\n".join(formatted)
 
     def _get_session_history(self, session_id: str) -> BaseChatMessageHistory:
@@ -198,27 +214,27 @@ class AIResearchAssistant:
         retriever = self._build_retriever(use_advanced=use_advanced)
         docs = retriever.invoke(question)
         context = self._format_docs_for_context(docs)
-        # Set comprehension de-duplicates: several retrieved chunks usually come from the
-        # same file, and the prompt should list each source once.
-        sources = list({d.metadata.get("source", "Unknown") for d in docs})
+        # Set de-duplicates: several retrieved chunks usually come from the same file, and
+        # the prompt should list each source once. sorted() keeps the prompt deterministic.
+        sources = sorted({d.metadata.get("source", "Unknown") for d in docs})
 
         # Prompt -- tell the LLM about available sources
         prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    """You are an AI Research Assistant. Analyze the provided documents 
-    and return a structured response.
+                    """You are an AI Research Assistant. Analyze the provided documents
+and return a structured response.
 
-    Rules:
-    1. ONLY use information from the provided context
-    2. If the context doesn't have the answer, say so in the answer field
-    3. Set confidence: "high" if directly stated, "medium" if inferred, "low" if partial
-    4. Include the source filenames you actually used
-    5. Extract key quotes word-for-word from the context
-    6. Suggest 2-3 follow-up questions the user might want to ask
+Rules:
+1. ONLY use information from the provided context
+2. If the context doesn't have the answer, say so in the answer field
+3. Set confidence: "high" if directly stated, "medium" if inferred, "low" if partial
+4. Include the source filenames you actually used
+5. Extract key quotes word-for-word from the context
+6. Suggest 2-3 follow-up questions the user might want to ask
 
-    Use conversation history to understand follow-up questions.""",
+Use conversation history to understand follow-up questions.""",
                 ),
                 # History sits BETWEEN the system rules and the freshly retrieved context,
                 # so prior turns can resolve pronouns ("the second component") without
@@ -228,11 +244,11 @@ class AIResearchAssistant:
                     "human",
                     """Context documents:
 
-    {context}
+{context}
 
-    Available sources: {sources}
+Available sources: {sources}
 
-    Question: {question}""",
+Question: {question}""",
                 ),
             ]
         )
@@ -244,11 +260,7 @@ class AIResearchAssistant:
                 "context": context,
                 "question": question,
                 "sources": ", ".join(sources),
-                "history": (
-                    history.messages[-10:]
-                    if hasattr(history, "messages")
-                    else history[-10:]
-                ),
+                "history": history.messages[-10:],
             }
         )
 
@@ -277,24 +289,24 @@ class AIResearchAssistant:
                 (
                     "system",
                     """You are an AI Research Assistant. Answer questions
-    based ONLY on the provided context documents.
+based ONLY on the provided context documents.
 
-    Rules:
-    1. Only use information from the context below
-    2. If the context doesn't have the answer, say so
-    3. Cite which sources you used (e.g. "According to Source 1...")
-    4. Rate your confidence: high, medium, or low""",
+Rules:
+1. Only use information from the context below
+2. If the context doesn't have the answer, say so
+3. Cite which sources you used (e.g. "According to Source 1...")
+4. Rate your confidence: high, medium, or low""",
                 ),
                 MessagesPlaceholder(variable_name="history"),
                 (
                     "human",
                     """Context documents:
 
-    {context}
+{context}
 
-    Question: {question}
+Question: {question}
 
-    Provide a clear answer with source citations.""",
+Provide a clear answer with source citations.""",
                 ),
             ]
         )
@@ -340,41 +352,12 @@ class AIResearchAssistant:
 
         print(f'Question: "{question}"\n')
 
-        # --- Basic ---
-        basic = self.vectorstore.as_retriever(
-            search_type="similarity", search_kwargs={"k": 4}
+        basic_docs, basic_total_chars = self._retrieve_and_print(
+            "BASIC RETRIEVER", self._build_retriever(use_advanced=False), question
         )
-        basic_docs = basic.invoke(question)
-
-        print("=" * 60)
-        print(f"BASIC RETRIEVER: {len(basic_docs)} chunks")
-        print("=" * 60)
-
-        basic_total_chars = 0
-        for i, doc in enumerate(basic_docs):
-            source = doc.metadata.get("source", "Unknown")
-            basic_total_chars += len(doc.page_content)
-            print(f"\n  Chunk {i+1} [{source}] ({len(doc.page_content)} chars):")
-            print(f"  {doc.page_content[:150]}...")
-
-        print(f"\n  Total text sent to LLM: {basic_total_chars} chars")
-
-        # --- Advanced ---
-        advanced = self._build_retriever(use_advanced=True)
-        advanced_docs = advanced.invoke(question)
-
-        print("\n" + "=" * 60)
-        print(f"ADVANCED RETRIEVER: {len(advanced_docs)} chunks")
-        print("=" * 60)
-
-        advanced_total_chars = 0
-        for i, doc in enumerate(advanced_docs):
-            source = doc.metadata.get("source", "Unknown")
-            advanced_total_chars += len(doc.page_content)
-            print(f"\n  Chunk {i+1} [{source}] ({len(doc.page_content)} chars):")
-            print(f"  {doc.page_content[:150]}...")
-
-        print(f"\n  Total text sent to LLM: {advanced_total_chars} chars")
+        advanced_docs, advanced_total_chars = self._retrieve_and_print(
+            "ADVANCED RETRIEVER", self._build_retriever(use_advanced=True), question
+        )
 
         # --- Summary ---
         print("\n" + "=" * 60)
@@ -383,11 +366,63 @@ class AIResearchAssistant:
         print(f"  Basic:    {len(basic_docs)} chunks, {basic_total_chars} chars")
         print(f"  Advanced: {len(advanced_docs)} chunks, {advanced_total_chars} chars")
 
-        if advanced_total_chars < basic_total_chars:
+        if basic_total_chars == 0:
+            print("  No documents retrieved to compare")
+        elif advanced_total_chars < basic_total_chars:
             reduction = round((1 - advanced_total_chars / basic_total_chars) * 100)
             print(f"  Compression saved {reduction}% of tokens!")
+        elif advanced_total_chars == basic_total_chars:
+            print("  Advanced returned the same amount of content")
         else:
             print("  Advanced found more targeted content")
+
+    def compare_compression(self, question: str):
+        """Show multi-query retrieval with compression on vs off."""
+
+        print(f'Question: "{question}"\n')
+
+        uncompressed_docs, uncompressed_chars = self._retrieve_and_print(
+            "MULTI-QUERY (compression OFF)",
+            self._build_retriever(use_advanced=True, compression=False),
+            question,
+        )
+        compressed_docs, compressed_chars = self._retrieve_and_print(
+            "MULTI-QUERY (compression ON)",
+            self._build_retriever(use_advanced=True, compression=True),
+            question,
+        )
+
+        print("\n" + "=" * 60)
+        print("COMPRESSION COMPARISON")
+        print("=" * 60)
+        print(f"  Off: {len(uncompressed_docs)} chunks, {uncompressed_chars} chars")
+        print(f"  On:  {len(compressed_docs)} chunks, {compressed_chars} chars")
+
+        if uncompressed_chars == 0:
+            print("  No documents retrieved to compare")
+        elif compressed_chars < uncompressed_chars:
+            reduction = round((1 - compressed_chars / uncompressed_chars) * 100)
+            print(f"  Compression saved {reduction}% of tokens!")
+        else:
+            print("  Compression didn't reduce content for this question")
+
+    def _retrieve_and_print(self, label: str, retriever, question: str):
+        """Run a retriever, print its chunks, and return (docs, total_chars)."""
+        docs = retriever.invoke(question)
+
+        print("=" * 60)
+        print(f"{label}: {len(docs)} chunks")
+        print("=" * 60)
+
+        total_chars = 0
+        for i, doc in enumerate(docs):
+            source = doc.metadata.get("source", "Unknown")
+            total_chars += len(doc.page_content)
+            print(f"\n  Chunk {i + 1} [{source}] ({len(doc.page_content)} chars):")
+            print(f"  {doc.page_content[:150]}...")
+
+        print(f"\n  Total text sent to LLM: {total_chars} chars")
+        return docs, total_chars
 
 
 def print_research_response(question: str, response: ResearchResponse):
@@ -408,13 +443,9 @@ def print_research_response(question: str, response: ResearchResponse):
         print(f"    - {fq}")
 
 
-if __name__ == "__main__":
-    import shutil
+def test_step0_load_data(assistant: AIResearchAssistant) -> None:
+    """Ingest the three demo documents the test_ steps below all query against."""
 
-    shutil.rmtree("./research_db", ignore_errors=True)
-    assistant = AIResearchAssistant()
-
-    # Add research docs
     assistant.add_text(
         """
         Attention Mechanisms in Neural Networks
@@ -470,9 +501,11 @@ if __name__ == "__main__":
 
     print(f"\nIndexed: {assistant.get_document_count()} chunks")
 
-    session = "structured_demo"
 
-    # --- Step 1: String vs Structured comparison ---
+def test_step1_string_vs_structured(assistant: AIResearchAssistant) -> None:
+    """ask() returns a plain string; ask_structured() returns a validated ResearchResponse.
+    Same question, same retrieval -- the difference is only in the output parser."""
+
     print("\n" + "=" * 60)
     print("STEP 1: String response vs Structured response")
     print("=" * 60)
@@ -493,7 +526,13 @@ if __name__ == "__main__":
     print(f"key_quotes:         {structured_response.key_quotes[:2]}")
     print(f"follow_up_questions: {structured_response.follow_up_questions}")
 
-    # --- Step 2: Access fields directly ---
+
+def test_step2_direct_field_access(
+    assistant: AIResearchAssistant, session: str
+) -> None:
+    """A structured response is a Pydantic object, so calling code can branch on
+    fields like `.confidence` directly instead of parsing a string."""
+
     print("\n" + "=" * 60)
     print("STEP 2: Use fields in your code")
     print("=" * 60)
@@ -512,7 +551,11 @@ if __name__ == "__main__":
     for fq in r.follow_up_questions:
         print(f"    -> {fq}")
 
-    # --- Step 3: Multi-turn with structured output ---
+
+def test_step3_multiturn_memory(assistant: AIResearchAssistant, session: str) -> None:
+    """Conversation history flows through ask_structured() too, so a follow-up like
+    "the second component" resolves using prior turns, not just the current retrieval."""
+
     print("\n" + "=" * 60)
     print("STEP 3: Memory works with structured output too")
     print("=" * 60)
@@ -523,24 +566,38 @@ if __name__ == "__main__":
     print_research_response(q1, r1)
 
     q2 = "How does the second component work?"
-    print(f"\n{'- '*30}")
+    print(f"\n{'- ' * 30}")
     print(f"\nUser: {q2}")
     r2 = assistant.ask_structured(q2, session)
     print_research_response(q2, r2)
 
     q3 = "Connect everything we discussed to LangChain."
-    print(f"\n{'- '*30}")
+    print(f"\n{'- ' * 30}")
     print(f"\nUser: {q3}")
     r3 = assistant.ask_structured(q3, session)
     print_research_response(q3, r3)
 
-    # --- Step 4: Final stats ---
+
+def test_step4_compression(assistant: AIResearchAssistant) -> None:
+    """Contextual compression trims each retrieved chunk down to the sentences that
+    actually answer the question -- see compare_compression() for the size difference."""
+
+    print("\n" + "=" * 60)
+    print("STEP 4: Contextual compression on vs off")
+    print("=" * 60)
+
+    assistant.compare_compression("What is the attention mechanism?")
+
+
+def test_step5_final_stats(assistant: AIResearchAssistant, session: str) -> None:
+    """Recap everything the demo touched: ingestion, retrieval, memory, structured output."""
+
     print("\n" + "=" * 60)
     print("FINAL: What we built across 5 videos")
     print("=" * 60)
 
     history = assistant._get_session_history(session)
-    msg_count = len(history.messages) if hasattr(history, "messages") else len(history)
+    msg_count = len(history.messages)
 
     print(
         f"""
@@ -555,6 +612,21 @@ if __name__ == "__main__":
   That's the full RAG pipeline.
     """
     )
+
+
+if __name__ == "__main__":
+    import shutil
+
+    shutil.rmtree("./research_db", ignore_errors=True)
+    assistant = AIResearchAssistant()
+    session = "structured_demo"
+
+    test_step0_load_data(assistant)
+    test_step1_string_vs_structured(assistant)
+    test_step2_direct_field_access(assistant, session)
+    test_step3_multiturn_memory(assistant, session)
+    test_step4_compression(assistant)
+    test_step5_final_stats(assistant, session)
 
     # Cleanup
     shutil.rmtree("./research_db", ignore_errors=True)

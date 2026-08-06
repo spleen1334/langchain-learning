@@ -30,7 +30,8 @@ logging.basicConfig(level=logging.INFO, format="%(name)s - %(message)s")
 logging.getLogger("langchain.retrievers.multi_query").setLevel(logging.INFO)
 
 
-INFO_BURIED = [
+# Larger Text for compression test
+TECH_DOCS_LARGE = [
     Document(
         page_content="""ACME AI SOLUTIONS - COMPANY HISTORY AND TECHNOLOGY STACK
 
@@ -107,6 +108,7 @@ with cross-region replication. RTO is 4 hours, and RPO is 1 hour.""",
         metadata={"source": "technical_docs_v2.4.pdf"},
     ),
 ]
+
 # Sample knowledge base for demos
 TECH_DOCS = [
     Document(
@@ -172,10 +174,15 @@ TECH_DOCS = [
 ]
 
 
-def create_base_vectorstore():
-    """Create a basic vector store for demos."""
+def create_base_vectorstore(use_large_docs: bool = False):
+    """Create a basic vector store for demos.
+
+    By default indexes the short TECH_DOCS. Pass use_large_docs=True to index
+    INFO_BURIED instead, for demos that need longer documents (e.g. compression).
+    """
+    documents = TECH_DOCS_LARGE if use_large_docs else TECH_DOCS
     return Chroma.from_documents(
-        documents=TECH_DOCS,
+        documents=documents,
         embedding=OpenAIEmbeddings(model="text-embedding-3-small"),
     )
 
@@ -211,8 +218,9 @@ def demo_multi_query_retriever():
     print(f"Retrieved {len(docs)} unique documents:")
     for i, doc in enumerate(docs):
         print(
-            f"\n{i+1}. [{doc.metadata.get('topic', 'N/A')}] {doc.page_content[:100]}..."
+            f"\n{i + 1}. [{doc.metadata.get('topic', 'N/A')}] {doc.page_content[:100]}..."
         )
+    print("-" * 60)
 
 
 def demo_contextual_compression():
@@ -223,7 +231,7 @@ def demo_contextual_compression():
     print("Extracts only query-relevant content from documents")
     print("=" * 60)
 
-    vectorstore = create_base_vectorstore()
+    vectorstore = create_base_vectorstore(use_large_docs=True)
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
     # "Compression" = an LLM pass over each retrieved chunk that keeps only the sentences
@@ -256,6 +264,8 @@ def demo_contextual_compression():
     for doc in compressed_docs:
         print(f"Length: {len(doc.page_content)} chars")
         print(f"Content: {doc.page_content}\n")
+
+    print("-" * 60)
 
 
 def demo_ensemble_hybrid_search():
@@ -310,6 +320,8 @@ def demo_ensemble_hybrid_search():
         print(f"Semantic top result: {semantic_results[0].page_content[:60]}...")
         print(f"Ensemble top result: {ensemble_results[0].page_content[:60]}...")
 
+    print("-" * 60)
+
 
 def demo_parent_document_retriever():
     """Parent Document Retriever: small chunks for search, large for context."""
@@ -318,6 +330,7 @@ def demo_parent_document_retriever():
     print("PARENT DOCUMENT RETRIEVER")
     print("Small chunks for precise search, large chunks for context")
     print("=" * 60)
+
     # Long document to demonstrate parent/child splitting
     long_doc = Document(
         page_content="""
@@ -401,6 +414,8 @@ LangSmith provides observability for LangChain/LangGraph applications, offering 
     print(f"Length: {len(parent_docs[0].page_content)} chars")
     print(f"Content preview: {parent_docs[0].page_content[:300]}...")
 
+    print("-" * 60)
+
 
 def demo_advanced_rag_chain():
     """Complete RAG chain with advanced retrieval."""
@@ -461,6 +476,8 @@ Answer:"""
         print(f"\nQ: {q}")
         answer = rag_chain.invoke(q)
         print(f"A: {answer}")
+
+    print("-" * 60)
 
 
 if __name__ == "__main__":

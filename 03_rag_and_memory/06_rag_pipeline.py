@@ -17,6 +17,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, Field
 
 load_dotenv()
+
 embeddings_model = OpenAIEmbeddings(model="text-embedding-3-small")
 
 # Sample knowledge base
@@ -104,9 +105,20 @@ and if you don't know the answer, just say "I don't know."""
     def format_docs(docs):
         return "\n\n".join([doc.page_content for doc in docs])
 
-    # A bare dict in an LCEL pipe is auto-coerced to RunnableParallel: the question
-    # string is fed to BOTH branches at once. `retriever | format_docs` retrieves and
-    # flattens; RunnablePassthrough forwards the raw question so the prompt gets both.
+    # A bare dict in an LCEL pipe is auto-coerced to RunnableParallel: the single
+    # input to the chain (a plain string here) is fed to EVERY value in the dict
+    # at once, not split up between them. Each branch runs independently:
+    #   - "context": retriever | format_docs
+    #       retriever.invoke(question) -> list[Document] (similarity search)
+    #       format_docs(docs)          -> "\n\n".join(...) (flattened string)
+    #   - "question": RunnablePassthrough()
+    #       a no-op Runnable that just returns its input unchanged, so the raw
+    #       question string survives into the output dict alongside "context".
+    # The dict's output is {"context": "<chunks>", "question": "<original question>"},
+    # which is exactly the shape ChatPromptTemplate.invoke() needs to fill in the
+    # {context}/{question} placeholders below — a prompt template can't accept a
+    # bare string, only a dict of its variable names. This "dict of parallel
+    # branches -> prompt" opener is the standard first stage of every RAG chain.
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
@@ -154,9 +166,12 @@ Answer (include sources):"""
         formatted = []
         for i, doc in enumerate(docs):
             source = doc.metadata.get("source", "unknown")
-            formatted.append(f"[{i+1}] {source}:\n{doc.page_content}")
+            formatted.append(f"[{i + 1}] {source}:\n{doc.page_content}")
         return "\n\n".join(formatted)
 
+    # Same RunnableParallel pattern as demo_basic_rag (see comment there): the
+    # question string is broadcast to both branches, retriever+format build
+    # "context", RunnablePassthrough carries "question" through unchanged.
     rag_chain = (
         {
             "context": retriever | format_docs_with_sources,
@@ -197,6 +212,8 @@ Answer:"""
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
 
+    # Same RunnableParallel pattern as demo_basic_rag: question broadcast to
+    # both branches, then merged into a {"context", "question"} dict for prompt.
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
@@ -254,11 +271,13 @@ Provide a structured response."""
             for doc in docs
         )
 
+    # Same RunnableParallel pattern as demo_basic_rag: question broadcast to
+    # both branches, then merged into a {"context", "question"} dict for prompt.
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
-        # No StrOutputParser: with_structured_output already yields a RAGResponse object.
         | structured_llm
+        # No StrOutputParser: with_structured_output already yields a RAGResponse object.
     )
     print("Structured RAG Demo:\n")
     result = rag_chain.invoke("What is LangGraph?")
@@ -311,6 +330,8 @@ Format: [Confidence: X] Answer"""
 
             # Built once in __init__ so the vector store and chain are reused across
             # every ask() — re-indexing per question would be the classic mistake here.
+            # Same RunnableParallel pattern as demo_basic_rag: question broadcast to
+            # both branches, then merged into a {"context", "question"} dict for prompt.
             self.chain = (
                 {
                     "context": self.retriever | format_docs,
@@ -348,8 +369,8 @@ Format: [Confidence: X] Answer"""
 
 
 if __name__ == "__main__":
-    # demo_basic_rag()
-    # demo_rag_with_sources()
-    # demo_rag_with_fallback()
-    # demo_structured_rag()
+    demo_basic_rag()
+    demo_rag_with_sources()
+    demo_rag_with_fallback()
+    demo_structured_rag()
     exercise_document_qa()
