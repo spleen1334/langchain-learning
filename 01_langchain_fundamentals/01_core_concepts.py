@@ -2,11 +2,14 @@
 LangChain Core Concepts - LCEL and Runnables
 """
 
+from typing import cast
+
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -87,8 +90,10 @@ def demo_schema_inspection():
     # Schemas are inferred from the chain's ends: input comes from the prompt's
     # template variables, output from the last component (str for StrOutputParser).
     # This is what powers automatic validation and the LangServe API docs.
-    input_schema = chain.input_schema.model_json_schema()
-    output_schema = chain.output_schema.model_json_schema()
+    # input_schema/output_schema are typed as a str|Pydantic-v1|Pydantic-v2 union for
+    # backward compat; cast to the pydantic v2 BaseModel this repo actually uses.
+    input_schema = cast(type[BaseModel], chain.input_schema).model_json_schema()
+    output_schema = cast(type[BaseModel], chain.output_schema).model_json_schema()
 
     print(f"Input Schema: {input_schema}")
     print(f"Output Schema: {output_schema}")
@@ -127,7 +132,11 @@ def new_way():
 
     # Used instead of ChatOpenAI(....)
     oldway = ChatOpenAI(
-        model="gpt-4o-mini", temperature=0.7, timeout=30, max_tokens=1500, max_retries=2
+        model="gpt-4o-mini",
+        temperature=0.7,
+        timeout=30,
+        max_completion_tokens=1500,
+        max_retries=2,
     )
 
     return model, oldway

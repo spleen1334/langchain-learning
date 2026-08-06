@@ -9,6 +9,7 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -44,7 +45,7 @@ def demo_memory_saver():
 
     # thread_id is the conversation key: the same id resumes the same state, a different
     # id starts a clean one. Passing no config at all with a checkpointer is an error.
-    config = {"configurable": {"thread_id": "user-123"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "user-123"}}
 
     print("Memory Saver Demo (Multi-turn conversation):\n")
 
@@ -88,7 +89,7 @@ def demo_sqlite_persistence():
     # First session
     with SqliteSaver.from_conn_string(db_path) as saver:
         app = graph.compile(checkpointer=saver)
-        config = {"configurable": {"thread_id": "persistent-user"}}
+        config: RunnableConfig = {"configurable": {"thread_id": "persistent-user"}}
 
         result = app.invoke(
             {
@@ -106,7 +107,7 @@ def demo_sqlite_persistence():
     # recovered from disk. This is the whole point of SqliteSaver over MemorySaver.
     with SqliteSaver.from_conn_string(db_path) as saver:
         app = graph.compile(checkpointer=saver)
-        config = {"configurable": {"thread_id": "persistent-user"}}
+        config: RunnableConfig = {"configurable": {"thread_id": "persistent-user"}}
 
         result = app.invoke(
             {"messages": [HumanMessage(content="What was the secret code?")]}, config
@@ -128,7 +129,7 @@ def demo_state_inspection():
 
     memory = MemorySaver()
     app = graph.compile(checkpointer=memory)
-    config = {"configurable": {"thread_id": "inspect-demo"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "inspect-demo"}}
 
     print("\nState Inspection Demo:\n")
 
@@ -171,7 +172,7 @@ def demo_branching_conversations():
     print("\nBranching Conversations Demo:\n")
 
     # Main conversation
-    main_config = {"configurable": {"thread_id": "main"}}
+    main_config: RunnableConfig = {"configurable": {"thread_id": "main"}}
     app.invoke(
         {"messages": [HumanMessage(content="What's the weather like?")]}, main_config
     )
@@ -180,7 +181,7 @@ def demo_branching_conversations():
     main_state = app.get_state(main_config)
 
     # Branch A - Beach vacation
-    branch_a_config = {"configurable": {"thread_id": "branch-beach"}}
+    branch_a_config: RunnableConfig = {"configurable": {"thread_id": "branch-beach"}}
     # Forking = writing the parent thread's state into a NEW thread_id. Both branches
     # then evolve independently and neither can affect "main".
     # Copy state to new thread
@@ -193,7 +194,7 @@ def demo_branching_conversations():
     print(f"Branch A (Beach): {result_a['messages'][-1].content[:100]}...")
 
     # Branch B - Mountain adventure
-    branch_b_config = {"configurable": {"thread_id": "branch-mountain"}}
+    branch_b_config: RunnableConfig = {"configurable": {"thread_id": "branch-mountain"}}
     app.update_state(branch_b_config, main_state.values)
 
     result_b = app.invoke(
@@ -239,7 +240,7 @@ def demo_checkpoint_internals():
 
     memory = MemorySaver()
     app = graph.compile(checkpointer=memory)
-    config = {"configurable": {"thread_id": "internals-demo"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "internals-demo"}}
 
     print("\nCheckpoint Internals Demo")
     print("=" * 55)
@@ -274,22 +275,26 @@ def demo_checkpoint_internals():
     print(f"   {state.next if state.next else '() — graph finished, no pending nodes'}")
 
     # state.config — the config that produced this snapshot
+    # "configurable" is a NotRequired key on RunnableConfig, so .get(..., {}) rather
+    # than [...] — it's always populated here, but the type checker can't know that.
+    state_configurable = state.config.get("configurable", {})
     print("\n3) state.config (thread + checkpoint IDs):")
-    print(f"   thread_id:     {state.config['configurable']['thread_id']}")
-    print(f"   checkpoint_id: {state.config['configurable']['checkpoint_id']}")
+    print(f"   thread_id:     {state_configurable.get('thread_id')}")
+    print(f"   checkpoint_id: {state_configurable.get('checkpoint_id')}")
 
-    # state.metadata — who created this checkpoint
+    # state.metadata — who created this checkpoint. It's Optional, so a run with no
+    # metadata (shouldn't happen once a checkpointer is attached) falls back to {}.
+    metadata = state.metadata or {}
     print("\n4) state.metadata (provenance info):")
-    print(f"   source:  {state.metadata.get('source', 'N/A')}")
-    print(f"   step:    {state.metadata.get('step', 'N/A')}")
-    print(f"   writes:  {state.metadata.get('writes', 'N/A')}")
+    print(f"   source:  {metadata.get('source', 'N/A')}")
+    print(f"   step:    {metadata.get('step', 'N/A')}")
+    print(f"   writes:  {metadata.get('writes', 'N/A')}")
 
     # state.parent_config — pointer to the PREVIOUS checkpoint
     print("\n5) state.parent_config (previous checkpoint):")
     if state.parent_config:
-        print(
-            f"   parent checkpoint_id: {state.parent_config['configurable']['checkpoint_id']}"
-        )
+        parent_configurable = state.parent_config.get("configurable", {})
+        print(f"   parent checkpoint_id: {parent_configurable.get('checkpoint_id')}")
     else:
         print("   None — this is the very first checkpoint")
 
@@ -305,11 +310,12 @@ def demo_checkpoint_internals():
     print("LangGraph saves a checkpoint at EACH step. Let's see them all:\n")
 
     for i, snapshot in enumerate(app.get_state_history(config)):
-        step_num = snapshot.metadata.get("step", "?")
-        source = snapshot.metadata.get("source", "?")
-        writes = snapshot.metadata.get("writes", {})
+        snapshot_metadata = snapshot.metadata or {}
+        step_num = snapshot_metadata.get("step", "?")
+        source = snapshot_metadata.get("source", "?")
+        writes = snapshot_metadata.get("writes", {})
         msg_count = len(snapshot.values.get("messages", []))
-        checkpoint_id = snapshot.config["configurable"]["checkpoint_id"]
+        checkpoint_id = snapshot.config.get("configurable", {}).get("checkpoint_id")
         current_step = snapshot.values.get("step", "")
 
         # metadata["writes"] is keyed by node name, so its first key identifies the
@@ -317,7 +323,7 @@ def demo_checkpoint_internals():
         node_name = next(iter(writes.keys())) if writes else "—"
 
         print(f"  Checkpoint {i}:")
-        print(f"    id:         {checkpoint_id[:30]}...")
+        print(f"    id:         {str(checkpoint_id)[:30]}...")
         print(f"    source:     {source}")
         print(f"    step:       {step_num}")
         print(f"    written by: {node_name}")
@@ -336,21 +342,21 @@ def demo_checkpoint_internals():
     # Find the checkpoint right after the "analyze" node ran
     target_snapshot = None
     for snapshot in app.get_state_history(config):
-        writes = snapshot.metadata.get("writes", {})
+        writes = (snapshot.metadata or {}).get("writes", {})
         if "analyze" in writes:
             target_snapshot = snapshot
             break
 
     if target_snapshot:
-        target_id = target_snapshot.config["configurable"]["checkpoint_id"]
-        print(f"  Found checkpoint after 'analyze' node: {target_id[:30]}...")
+        target_id = target_snapshot.config.get("configurable", {}).get("checkpoint_id")
+        print(f"  Found checkpoint after 'analyze' node: {str(target_id)[:30]}...")
         print(f"  Messages at that point: {len(target_snapshot.values['messages'])}")
         print(f"  state.step at that point: '{target_snapshot.values.get('step', '')}'")
 
         # You can resume from this exact checkpoint
         # Adding checkpoint_id to the config addresses ONE specific snapshot instead of
         # the thread's latest — this is how time travel / replay works.
-        rewind_config = {
+        rewind_config: RunnableConfig = {
             "configurable": {"thread_id": "internals-demo", "checkpoint_id": target_id}
         }
 

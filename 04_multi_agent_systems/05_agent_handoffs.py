@@ -3,7 +3,7 @@ Agent Handoffs in LangGraph
 Passing control and context between agents
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -53,7 +53,7 @@ def create_customer_service_system():
         handoff_llm = llm.with_structured_output(HandoffDecision)
 
         messages = [SystemMessage(content=system)] + state["messages"]
-        decision = handoff_llm.invoke(messages)
+        decision = cast(HandoffDecision, handoff_llm.invoke(messages))
 
         # "end" = triage handles it itself. Avoids a pointless specialist hop (and its
         # extra LLM call) for trivial questions.

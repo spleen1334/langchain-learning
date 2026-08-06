@@ -1,4 +1,5 @@
-from typing import Literal
+from pathlib import Path
+from typing import Literal, cast
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
@@ -8,6 +9,24 @@ from typing_extensions import TypedDict
 load_dotenv()
 
 llm = init_chat_model("gpt-4o-mini", temperature=0.0)
+
+GRAPH_DIR = Path(__file__).parent / "graph"
+
+
+def visualize_graph(app, name: str) -> None:
+    """Print the mermaid source and save a PNG render for a compiled graph.
+
+    `name` should identify the demo the graph belongs to (e.g. "demo_basic_routing");
+    the PNG is written to graph/graph_ce_<name>.png.
+    """
+    print("\n--- Mermaid Graph ---")
+    print(app.get_graph().draw_mermaid())
+
+    GRAPH_DIR.mkdir(exist_ok=True)
+    png_path = GRAPH_DIR / f"graph_ce_{name}.png"
+    # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
+    png_path.write_bytes(app.get_graph().draw_mermaid_png())
+    print(f"\nGraph saved to {png_path}")
 
 
 class RouterState(TypedDict):
@@ -22,7 +41,7 @@ def demo_basic_routing():
             f"Classify this query as 'question', 'command', or 'statement'. "
             f"Reply with just the word.\n\n{state['query']}"
         )
-        return {"query_type": response.content.lower().strip()}
+        return {"query_type": str(response.content).lower().strip()}
 
     def handle_question(state: RouterState) -> dict:
         response = llm.invoke(f"Answer this question: {state['query']}")
@@ -74,15 +93,7 @@ def demo_basic_routing():
 
     app = graph.compile()
 
-    # # visualize the graph
-    # print("\n--- Mermaid Graph ---")
-    # print(app.get_graph().draw_mermaid())
-
-    # # save as PNG
-    # png_bytes = app.get_graph().draw_mermaid_png()
-    # with open("graph_new.png", "wb") as f:
-    #     f.write(png_bytes)
-    # print("\nGraph saved to graph_new.png")
+    visualize_graph(app, "demo_basic_routing")
 
     # Example usage
     queries = [
@@ -92,7 +103,7 @@ def demo_basic_routing():
     ]
 
     for query in queries:
-        result = app.invoke({"query": query})
+        result = app.invoke(cast(RouterState, {"query": query}))
         print(f"Query: {query}")
         print(f"Type: {result['query_type']}")
         print(f"Response: {result['response']}")
@@ -115,7 +126,7 @@ def demo_conditional_loop():
             f"Content: {state['content']}"
         )
         try:
-            score = int(response.content.strip())
+            score = int(str(response.content).strip())
         except ValueError:
             # LLM returned prose instead of a bare number. Defaulting to a mid score
             # keeps the loop running (and below the 7 threshold, so it retries).
@@ -164,15 +175,7 @@ def demo_conditional_loop():
 
     app = graph.compile()
 
-    # visualize the graph
-    print("\n--- Mermaid Graph ---")
-    print(app.get_graph().draw_mermaid())
-
-    # save as PNG
-    png_bytes = app.get_graph().draw_mermaid_png()
-    with open("graph_newest.png", "wb") as f:
-        f.write(png_bytes)
-    print("\nGraph saved to graph_newest.png")
+    visualize_graph(app, "demo_conditional_loop")
 
     # Example usage
     print("\nConditional Loop Demo:\n")
@@ -193,6 +196,7 @@ def demo_conditional_loop():
 
 
 def demo_multi_path_routing():
+
     class TaskState(TypedDict):
         task: str
         urgency: str
@@ -212,8 +216,8 @@ def demo_multi_path_routing():
         )
 
         return {
-            "urgency": urgency_response.content.lower().strip(),
-            "complexity": complexity_response.content.lower().strip(),
+            "urgency": str(urgency_response.content).lower().strip(),
+            "complexity": str(complexity_response.content).lower().strip(),
         }
 
     def urgent_complex_handler(state: TaskState) -> dict:
@@ -280,15 +284,7 @@ def demo_multi_path_routing():
 
     app = graph.compile()
 
-    # visualize the graph
-    print("\n--- Mermaid Graph ---")
-    print(app.get_graph().draw_mermaid())
-
-    # save as PNG
-    png_bytes = app.get_graph().draw_mermaid_png()
-    with open("graph_complex.png", "wb") as f:
-        f.write(png_bytes)
-    print("\nGraph saved to graph_complex.png")
+    visualize_graph(app, "demo_multi_path_routing")
 
     print("\nMulti-Path Routing Demo:\n")
 
@@ -300,7 +296,7 @@ def demo_multi_path_routing():
     ]
 
     for task in tasks:
-        result = app.invoke({"task": task})
+        result = app.invoke(cast(TaskState, {"task": task}))
         print(f"Task: {task}")
         print(f"Urgency: {result['urgency']} | Complexity: {result['complexity']}")
         print(f"Handler: {result['handler']}")
@@ -309,6 +305,6 @@ def demo_multi_path_routing():
 
 
 if __name__ == "__main__":
-    # demo_basic_routing()
-    # demo_conditional_loop()
+    demo_basic_routing()
+    demo_conditional_loop()
     demo_multi_path_routing()

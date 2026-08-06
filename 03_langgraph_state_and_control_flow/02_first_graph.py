@@ -38,7 +38,7 @@ def create_conversation_graph():
             ]
         )
 
-        return {"sentiment": response.content.lower().strip()}
+        return {"sentiment": str(response.content).lower().strip()}
 
     def generate_response(state: ConversationState) -> dict:
         """Generate appropriate response based on sentiment."""
@@ -78,33 +78,31 @@ def create_conversation_graph():
     return app
 
 
+def demo_conversation():
+    app = create_conversation_graph()
 
-def demo_conversation(): 
-    app = create_conversation_graph() 
-    
     # Simulate a conversation
-    
+
     test_messages = [
         "I just got promoted at work! I'm so excited!",
         "My computer crashed and I lost all my work...",
         "What's the weather like today?",
     ]
-    
+
     print("Conversation Graph Demo:\n")
 
     # Each invoke() starts from a fresh state — without a checkpointer the graph keeps
     # nothing between runs, so these three messages are independent, not one conversation.
     for msg in test_messages:
-        result = app.invoke({
-            "messages": [f"Human: {msg}"],
-            "sentiment": "",
-            "response_count": 0
-        })
+        result = app.invoke(
+            {"messages": [f"Human: {msg}"], "sentiment": "", "response_count": 0}
+        )
 
         print(f"Input: {msg}")
         print(f"Sentiment: {result['sentiment']}")
         print(f"Response: {result['messages'][-1]}")
         print("-" * 40)
-    
+
+
 if __name__ == "__main__":
     demo_conversation()

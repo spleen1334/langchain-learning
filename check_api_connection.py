@@ -28,7 +28,9 @@ def test_openai():
 
 
 def test_anthropic():
-    llm_anthropic = ChatAnthropic(model="claude-sonnet-4-5-20250929", temperature=0)
+    llm_anthropic = ChatAnthropic(
+        model_name="claude-sonnet-4-5-20250929", temperature=0, timeout=30, stop=None
+    )
     response_anthropic = llm_anthropic.invoke("Say 'setup complete!' in one word")
     print(f"Response from ChatAnthropic: {response_anthropic}")
 

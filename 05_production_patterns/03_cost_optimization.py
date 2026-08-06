@@ -42,7 +42,7 @@ Respond with only: simple or complex
         )
 
         response = self.classifier.invoke(prompt.format(query=query))
-        return response.content.strip().lower()
+        return str(response.content).strip().lower()
 
     @traceable(name="routed_query")
     def invoke(self, query: str) -> tuple[str, str, float]:
@@ -70,7 +70,7 @@ Respond with only: simple or complex
         tokens = len(query.split()) * 1.3  # Rough token estimate
         estimated_cost = (tokens / 1000) * cost_per_1k
 
-        return response.content, model_name, estimated_cost
+        return str(response.content), model_name, estimated_cost
 
 
 def demo_model_routing():
@@ -165,7 +165,7 @@ class CachedLLM:
         # Call LLM
         self.cache_misses += 1
         response = self.llm.invoke(query)
-        result = response.content
+        result = str(response.content)
 
         # Cache result
         self.cache.set(query, result)
@@ -262,7 +262,7 @@ class BudgetedLLM:
 
         # Execute
         response = self.llm.invoke(query)
-        result = response.content
+        result = str(response.content)
 
         # Record usage
         output_tokens = self.budget.estimate_tokens(result)

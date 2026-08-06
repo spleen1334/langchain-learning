@@ -3,7 +3,7 @@ Hierarchical Agents in LangGraph
 Multi-level supervisors with department routing using subgraphs
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -310,9 +310,6 @@ def build_analysis_team() -> StateGraph:
     return analysis_graph
 
 
-
-
-
 # ============================================================
 # Top-Level Supervisor (parent graph)
 # ============================================================
@@ -340,19 +337,22 @@ def create_hierarchical_system():
 
     def ceo_supervisor(state: TeamState) -> dict:
         """Top-level supervisor routes to the right department."""
-        decision = router_llm.invoke(
-            [
-                SystemMessage(
-                    content=(
-                        "You are the CEO supervisor. Route the request to the right department:\n"
-                        "- research: Fact-finding, investigation, technical deep-dives\n"
-                        "- content: Writing, blog posts, marketing copy, summaries\n"
-                        "- analysis: Data analysis, strategy, business decisions\n\n"
-                        "Choose the BEST fit department."
-                    )
-                ),
-                *state["messages"],
-            ]
+        decision = cast(
+            DepartmentRoute,
+            router_llm.invoke(
+                [
+                    SystemMessage(
+                        content=(
+                            "You are the CEO supervisor. Route the request to the right department:\n"
+                            "- research: Fact-finding, investigation, technical deep-dives\n"
+                            "- content: Writing, blog posts, marketing copy, summaries\n"
+                            "- analysis: Data analysis, strategy, business decisions\n\n"
+                            "Choose the BEST fit department."
+                        )
+                    ),
+                    *state["messages"],
+                ]
+            ),
         )
 
         return {
@@ -376,11 +376,12 @@ def create_hierarchical_system():
                 last_ai = msg
                 break
 
-        if last_ai and "research" in last_ai.content.lower():
+        last_ai_content = str(last_ai.content).lower() if last_ai else ""
+        if "research" in last_ai_content:
             return "research_team"
-        elif last_ai and "content" in last_ai.content.lower():
+        elif "content" in last_ai_content:
             return "content_team"
-        elif last_ai and "analysis" in last_ai.content.lower():
+        elif "analysis" in last_ai_content:
             return "analysis_team"
         return "research_team"  # default
 

@@ -1,4 +1,5 @@
 import operator
+from pathlib import Path
 from typing import Annotated, Literal
 
 from dotenv import load_dotenv
@@ -14,6 +15,24 @@ Self-correcting agents and iterative refinement
 """
 
 llm = init_chat_model("gpt-4o-mini", temperature=0.0)
+
+GRAPH_DIR = Path(__file__).parent / "graph"
+
+
+def visualize_graph(app, name: str) -> None:
+    """Print the mermaid source and save a PNG render for a compiled graph.
+
+    `name` should identify the demo the graph belongs to (e.g. "demo_self_correcting_code");
+    the PNG is written to graph/graph_cl_<name>.png.
+    """
+    print("\n--- Mermaid Graph ---")
+    print(app.get_graph().draw_mermaid())
+
+    GRAPH_DIR.mkdir(exist_ok=True)
+    png_path = GRAPH_DIR / f"graph_cl_{name}.png"
+    # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
+    png_path.write_bytes(app.get_graph().draw_mermaid_png())
+    print(f"\nGraph saved to {png_path}")
 
 
 class CodeGenState(TypedDict):
@@ -45,7 +64,7 @@ def demo_self_correcting_code():
             )
 
         response = llm.invoke(prompt)
-        code = response.content.strip()
+        code = str(response.content).strip()
 
         # LLMs wrap code in ```python fences even when told not to; splitting on ```
         # takes the fenced body, then the language tag is stripped off the front.
@@ -114,7 +133,7 @@ def demo_self_correcting_code():
     # "end" target: routing straight to END is possible but a real node is easier to
     # extend (logging, persistence) and shows up in the rendered graph.
     def finalize(state: CodeGenState) -> dict:
-        return state
+        return dict(state)
 
     graph = StateGraph(CodeGenState)
 
@@ -131,15 +150,7 @@ def demo_self_correcting_code():
 
     app = graph.compile()
 
-    # visualize the graph
-    print("\n--- Mermaid Graph ---")
-    # print(app.get_graph().draw_mermaid())
-
-    # save as PNG
-    png_bytes = app.get_graph().draw_mermaid_png()
-    with open("graph_code.png", "wb") as f:
-        f.write(png_bytes)
-    print("\nGraph saved to graph_code.png")
+    visualize_graph(app, "demo_self_correcting_code")
 
     print("Self-Correcting Code Generator:\n")
 
@@ -187,9 +198,10 @@ def demo_iterative_research():
             print(f"   Following up on: {question}")
 
         response = llm.invoke(query)
-        print(f"   ✅ Found {len(response.content.splitlines())} lines of findings")
-        print(f"   Preview: {response.content[:120]}...")
-        return {"findings": [response.content]}
+        content = str(response.content)
+        print(f"   ✅ Found {len(content.splitlines())} lines of findings")
+        print(f"   Preview: {content[:120]}...")
+        return {"findings": [content]}
 
     def generate_questions(state: ResearchState) -> dict:
         print(f"\n{'─' * 50}")
@@ -200,11 +212,12 @@ def demo_iterative_research():
             "What's one deeper question to explore? Reply with just the question."
         )
 
-        print(f"   Next question: {response.content.strip()}")
+        content = str(response.content)
+        print(f"   Next question: {content.strip()}")
 
         # The iteration counter is bumped HERE, not in research(), so one "depth" equals
         # a full research -> question cycle and the router below counts it correctly.
-        return {"questions": [response.content], "iteration": state["iteration"] + 1}
+        return {"questions": [content], "iteration": state["iteration"] + 1}
 
     def synthesize(state: ResearchState) -> dict:
         print(f"\n{'─' * 50}")
@@ -218,8 +231,9 @@ def demo_iterative_research():
             f"Synthesize these findings into a coherent summary:\n\n{all_findings}"
         )
 
-        print(f"   ✅ Summary generated ({len(response.content.split())} words)")
-        return {"summary": response.content}
+        content = str(response.content)
+        print(f"   ✅ Summary generated ({len(content.split())} words)")
+        return {"summary": content}
 
     def should_continue(state: ResearchState) -> Literal["research", "synthesize"]:
         if state["iteration"] >= state["max_depth"]:

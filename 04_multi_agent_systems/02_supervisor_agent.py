@@ -3,7 +3,7 @@ Supervisor Architecture in LangGraph
 One agent coordinates multiple specialist agents
 """
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -61,7 +61,7 @@ def create_supervisor_system():
         # its only view of what the specialists have already produced.
         messages = [SystemMessage(content=system_prompt)] + state["messages"]
 
-        decision = supervisor_llm.invoke(messages)
+        decision = cast(RouteDecision, supervisor_llm.invoke(messages))
 
         # On FINISH, deliberately no message is appended — nothing to add to the
         # transcript, and task_complete is what the router below actually checks.
@@ -118,7 +118,7 @@ def create_supervisor_system():
 
         # Sliding window of the last few messages: keeps the specialist's prompt bounded
         # as the shared transcript grows (the critic below uses an even tighter window).
-        context = "\n".join([m.content for m in state["messages"][-5:]])
+        context = "\n".join([str(m.content) for m in state["messages"][-5:]])
         response = llm.invoke(prompt.format_messages(context=context))
 
         return {"messages": [AIMessage(content=f"[Writer] {response.content}")]}
@@ -134,7 +134,7 @@ def create_supervisor_system():
             ]
         )
 
-        context = "\n".join([m.content for m in state["messages"][-3:]])
+        context = "\n".join([str(m.content) for m in state["messages"][-3:]])
         response = llm.invoke(prompt.format_messages(context=context))
 
         return {"messages": [AIMessage(content=f"[Critic] {response.content}")]}
@@ -143,8 +143,8 @@ def create_supervisor_system():
         # Scans BACKWARDS for the newest [Writer] output — the deliverable is the writer's
         # latest draft, not the critic's feedback or the supervisor's routing note.
         for msg in reversed(state["messages"]):
-            if isinstance(msg, AIMessage) and "[Writer]" in msg.content:
-                content = msg.content.replace("[Writer] ", "")
+            if isinstance(msg, AIMessage) and "[Writer]" in str(msg.content):
+                content = str(msg.content).replace("[Writer] ", "")
                 return {"final_response": content}
 
         return {"final_response": "Task completed."}

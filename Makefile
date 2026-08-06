@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 # Folders that hold course code, in reading order. Update this list if a folder is
 # added/renamed — every target below (lint-<dir>, fix-<dir>, ...) derives from it.
-DIRS := 01_langchain_fundamentals 03_langgraph_control_flow 02_rag_and_memory \
+DIRS := 01_langchain_fundamentals 03_langgraph_state_and_control_flow 02_rag_and_memory \
         04_multi_agent_systems 05_production_patterns projects
 
 .DEFAULT_GOAL := help

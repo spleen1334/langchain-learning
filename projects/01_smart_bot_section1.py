@@ -4,6 +4,7 @@ A production-ready question-answering bot with structured output
 """
 
 import os
+from typing import cast
 
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
@@ -77,7 +78,7 @@ class SmartQABot:
     def ask(self, question: str) -> QAResponse:
         try:
             response = self.chain.invoke({"question": question})
-            return response
+            return cast(QAResponse, response)
         # Broad catch by design: callers are typed to always receive a QAResponse, so an
         # API outage or a schema-validation failure becomes a low-confidence answer
         # rather than an exception leaking into the UI.
@@ -97,7 +98,7 @@ class SmartQABot:
         inputs = [{"question": q} for q in questions]
         # Note this bypasses ask()'s error handling: .batch() raises if any item fails.
         # Use .batch(..., return_exceptions=True) to get per-item failures instead.
-        return self.chain.batch(inputs)
+        return cast(list[QAResponse], self.chain.batch(inputs))
 
 
 # -- Demo Usage --

@@ -4,6 +4,7 @@ Complete retrieval-augmented generation implementation
 """
 
 import tempfile
+from typing import cast
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
@@ -280,7 +281,7 @@ Provide a structured response."""
         # No StrOutputParser: with_structured_output already yields a RAGResponse object.
     )
     print("Structured RAG Demo:\n")
-    result = rag_chain.invoke("What is LangGraph?")
+    result = cast(RAGResponse, rag_chain.invoke("What is LangGraph?"))
 
     print(f"Answer: {result.answer}")
     print(f"Confidence: {result.confidence}")

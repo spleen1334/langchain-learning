@@ -1,5 +1,5 @@
 import operator
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -61,7 +61,7 @@ def supervisor(state: SupervisorState) -> dict:
 
     messages = [SystemMessage(content=system_prompt)] + state["messages"]
 
-    decision = supervisor_llm.invoke(messages)
+    decision = cast(RouteDecision, supervisor_llm.invoke(messages))
 
     if decision.next == "FINISH":
         return {"next_agent": "FINISH", "task_complete": True}
@@ -111,7 +111,7 @@ def writer(state: SupervisorState) -> dict:
 
     # Last 5 messages ≈ research output + supervisor note + any critic feedback, which is
     # what the writer needs. Bounded so prompt size doesn't grow with each revision loop.
-    context = "\n".join([m.content for m in state["messages"][-5:]])
+    context = "\n".join([str(m.content) for m in state["messages"][-5:]])
 
     response = llm.invoke(
         [
@@ -133,7 +133,7 @@ def critic(state: SupervisorState) -> dict:
     - If it needs work, explain exactly what to improve"""
 
     # Get the most recent work
-    context = "\n".join([m.content for m in state["messages"][-3:]])
+    context = "\n".join([str(m.content) for m in state["messages"][-3:]])
 
     response = llm.invoke(
         [
@@ -150,8 +150,8 @@ def finalize(state: SupervisorState) -> dict:
 
     # Find the last Writer output
     for msg in reversed(state["messages"]):
-        if isinstance(msg, AIMessage) and "[Writer]" in msg.content:
-            content = msg.content.replace("[Writer] ", "")
+        if isinstance(msg, AIMessage) and "[Writer]" in str(msg.content):
+            content = str(msg.content).replace("[Writer] ", "")
             return {"final_response": content}
 
     return {"final_response": "Task completed."}
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     agent = build_multi_agent_system()
 
     # Initial state
-    initial_state = {
+    initial_state: SupervisorState = {
         "messages": [
             HumanMessage(
                 content="Write a short blog post about the benefits of AI in healthcare"
@@ -235,8 +235,9 @@ if __name__ == "__main__":
     for msg in result["messages"]:
         if isinstance(msg, AIMessage):
             # Truncate for display
+            msg_content = str(msg.content)
             content = (
-                msg.content[:200] + "..." if len(msg.content) > 200 else msg.content
+                msg_content[:200] + "..." if len(msg_content) > 200 else msg_content
             )
             print(f"\n{content}")
 

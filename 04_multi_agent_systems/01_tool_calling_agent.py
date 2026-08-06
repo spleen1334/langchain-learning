@@ -77,7 +77,7 @@ def create_tool_agent():
     # anything — it only emits a `tool_calls` list on the AIMessage; ToolNode runs them.
     llm_with_tools = llm.bind_tools(tools)  # this is the secret!
 
-    def agent_node(state: AgentState) -> str:
+    def agent_node(state: AgentState) -> dict:
         # Generate a response using the LLM with tool access
         response = llm_with_tools.invoke(state["messages"])
         return {"messages": [response]}
@@ -88,7 +88,7 @@ def create_tool_agent():
 
         # The ONLY termination signal in an agent loop: an AIMessage with no tool_calls
         # means the model produced a final answer instead of requesting another tool.
-        if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+        if not isinstance(last_message, AIMessage) or not last_message.tool_calls:
             return "end"
         return "tools"
 
@@ -202,7 +202,7 @@ def demo_tool_with_errors():
 
     def should_continue(state: AgentState) -> Literal["tools", "end"]:
         last_message = state["messages"][-1]
-        if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+        if not isinstance(last_message, AIMessage) or not last_message.tool_calls:
             return "end"
         return "tools"
 

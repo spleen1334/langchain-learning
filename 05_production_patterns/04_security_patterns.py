@@ -178,7 +178,7 @@ Only respond with the JSON, nothing else.""",
         response = self.chain.invoke({"input": user_input})
 
         try:
-            return json.loads(response.content)
+            return json.loads(str(response.content))
         except json.JSONDecodeError:
             # FAIL CLOSED: an unparseable guard response is treated as unsafe. Defaulting
             # to safe=True here would turn any malformed reply into a security bypass.
@@ -328,7 +328,7 @@ class SecurePipeline:
 
         # Step 4: Process with LLM
         response = self.llm.invoke(sanitized)
-        output = response.content
+        output = str(response.content)
 
         # Step 5: Output validation
         is_valid, cleaned_output, val_reason = self.validator.validate(output)

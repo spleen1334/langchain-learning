@@ -6,6 +6,7 @@ Interrupt, review, modify, and resume
 from typing import Literal
 
 from dotenv import load_dotenv
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -45,14 +46,15 @@ def demo_interrupt_for_approval():
 
     def create_draft(state: ApprovalState) -> dict:
         step_print("📝", "DRAFT NODE", "Entering create_draft node...")
-        print(f"   Request: \"{state['request']}\"")
+        print(f'   Request: "{state["request"]}"')
         print("   Calling LLM to generate draft...")
 
         response = llm.invoke(f"Create a professional response for: {state['request']}")
+        content = str(response.content)
 
-        print(f"   Draft generated ({len(response.content.split())} words)")
-        print(f"   Preview: {response.content[:100]}...")
-        return {"draft": response.content}
+        print(f"   Draft generated ({len(content.split())} words)")
+        print(f"   Preview: {content[:100]}...")
+        return {"draft": content}
 
     def wait_for_approval(state: ApprovalState) -> dict:
         step_print("👁️", "APPROVAL NODE", "Entering wait_for_approval node...")
@@ -63,7 +65,7 @@ def demo_interrupt_for_approval():
             else "   Feedback: (none yet)"
         )
         # This node is where we'll interrupt
-        return state
+        return dict(state)
 
     def finalize(state: ApprovalState) -> dict:
         step_print("📦", "FINALIZE NODE", "Entering finalize node...")
@@ -74,15 +76,16 @@ def demo_interrupt_for_approval():
             return {"final": state["draft"]}
         else:
             print("   Action: Revising draft based on feedback...")
-            print(f"   Feedback: \"{state['feedback']}\"")
+            print(f'   Feedback: "{state["feedback"]}"')
             # Incorporate feedback
             response = llm.invoke(
                 f"Revise this draft based on feedback:\n\n"
                 f"Draft: {state['draft']}\n\n"
                 f"Feedback: {state['feedback']}"
             )
-            print(f"   Revised draft generated ({len(response.content.split())} words)")
-            return {"final": response.content}
+            content = str(response.content)
+            print(f"   Revised draft generated ({len(content.split())} words)")
+            return {"final": content}
 
     graph = StateGraph(ApprovalState)
 
@@ -100,7 +103,8 @@ def demo_interrupt_for_approval():
     # The process is not blocked — invoke() returns normally with the partial state.
     memory = MemorySaver()
     app = graph.compile(
-        checkpointer=memory, interrupt_before=["approval"]  # Pause before this node
+        checkpointer=memory,
+        interrupt_before=["approval"],  # Pause before this node
     )
 
     print("\n" + "=" * 55)
@@ -111,7 +115,7 @@ def demo_interrupt_for_approval():
     print("   Interrupt set BEFORE: 'approval' node")
 
     # Configuration for this thread
-    config = {"configurable": {"thread_id": "demo-1"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "demo-1"}}
 
     # ─── PHASE 1: Run until interrupt ───
     phase_banner(1, "RUN UNTIL INTERRUPT")
@@ -160,7 +164,8 @@ def demo_interrupt_for_approval():
     # reducers a node would) and creates a new checkpoint — this is the supported way
     # to inject human decisions between steps.
     app.update_state(
-        config, {"approved": False, "feedback": feedback_text}  # Request changes
+        config,
+        {"approved": False, "feedback": feedback_text},  # Request changes
     )
 
     print("   State updated. approved=False, feedback set.")
@@ -210,7 +215,7 @@ def demo_iterative_review():
 
         if not state["review_comments"]:
             print("   No comments to apply. Passing through.")
-            return state
+            return dict(state)
 
         feedback = state["review_comments"][-1]
         print(f'   Feedback to apply: "{feedback}"')
@@ -223,11 +228,12 @@ def demo_iterative_review():
             f"Feedback: {feedback}"
         )
 
-        print(f"   Revised document ({len(response.content.split())} words)")
-        print(f"   Preview: {response.content[:100]}...")
+        content = str(response.content)
+        print(f"   Revised document ({len(content.split())} words)")
+        print(f"   Preview: {content[:100]}...")
 
         return {
-            "document": response.content,
+            "document": content,
             "revision_count": state["revision_count"] + 1,
             "status": "revised",
         }
@@ -278,7 +284,7 @@ def demo_iterative_review():
     )
     print("   Interrupt set BEFORE: 'submit' node (fires EVERY loop)")
 
-    config = {"configurable": {"thread_id": "review-1"}}
+    config: RunnableConfig = {"configurable": {"thread_id": "review-1"}}
 
     # ─── ROUND 0: Initial submission ───
     phase_banner(0, "INITIAL SUBMISSION")
@@ -296,7 +302,7 @@ def demo_iterative_review():
     )
 
     step_print("⏸️", "PAUSED", "Graph hit interrupt_before='submit'")
-    print(f"   Document ready for review: \"{result['document']}\"")
+    print(f'   Document ready for review: "{result["document"]}"')
     print(f"   Revisions so far: {result['revision_count']}")
 
     current_state = app.get_state(config)

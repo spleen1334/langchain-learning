@@ -3,6 +3,8 @@ Understanding Chains in LangChain V.1
 LCEL patterns, composition, and debugging
 """
 
+from typing import cast
+
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.output_parsers import StrOutputParser
@@ -13,6 +15,7 @@ from langchain_core.runnables import (
     RunnableParallel,
     RunnablePassthrough,
 )
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -89,6 +92,9 @@ def demo_passthrough_chain():
         print("Fake storing data to VectorDB...")
         return " LangChain was created by Harrison Chase in 2022."
 
+    def flatten_context_and_question(x: dict) -> dict:
+        return {"context": x["context"], "question": x["question"]["question"]}
+
     # This is the canonical RAG shape: retrieve context while forwarding the original
     # question unchanged. RunnablePassthrough copies the input through untouched, which
     # is why x["question"] here is the whole input DICT and needs the extra ["question"]
@@ -111,9 +117,7 @@ def demo_passthrough_chain():
         # {"context": "...", "question": "..."} so it matches the prompt's
         # {context}/{question} template variables.
         # THIS IS MOSTLY CLEANUP STEP
-        | RunnableLambda(
-            lambda x: {"context": x["context"], "question": x["question"]["question"]}
-        )
+        | RunnableLambda(flatten_context_and_question)
         | prompt
         | model
         | StrOutputParser()
@@ -171,8 +175,14 @@ def demo_debbuging():
     chain = prompt | model | StrOutputParser()
 
     # Method 1: Get configuration
-    print("Chain input schema:", chain.input_schema.model_json_schema())
-    print("Chain output schema:", chain.output_schema.model_json_schema())
+    print(
+        "Chain input schema:",
+        cast(type[BaseModel], chain.input_schema).model_json_schema(),
+    )
+    print(
+        "Chain output schema:",
+        cast(type[BaseModel], chain.output_schema).model_json_schema(),
+    )
 
     # with_config returns a *copy* of the chain with the config attached (it does not
     # mutate `chain`). run_name/tags are what you'll search on in the LangSmith UI.

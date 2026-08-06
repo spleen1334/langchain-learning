@@ -4,7 +4,8 @@ StateGraph, nodes, edges, and basic patterns
 """
 
 import operator
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, cast
 
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
@@ -13,6 +14,24 @@ from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
 load_dotenv()
+
+GRAPH_DIR = Path(__file__).parent / "graph"
+
+
+def visualize_graph(app, name: str) -> None:
+    """Print the mermaid source and save a PNG render for a compiled graph.
+
+    `name` should identify the demo the graph belongs to (e.g. "demo_simple_graph");
+    the PNG is written to graph/graph_<name>.png.
+    """
+    print("\n--- Mermaid Graph ---")
+    print(app.get_graph().draw_mermaid())
+
+    GRAPH_DIR.mkdir(exist_ok=True)
+    png_path = GRAPH_DIR / f"graph_{name}.png"
+    # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
+    png_path.write_bytes(app.get_graph().draw_mermaid_png())
+    print(f"\nGraph saved to {png_path}")
 
 
 # Basic state
@@ -23,6 +42,7 @@ class SimpleState(TypedDict):
 
 
 def demo_simple_graph():
+
     # define node functions
     # A node returns a PARTIAL state dict; LangGraph merges it into the running state.
     # Keys you omit (here: "input") are left untouched, not cleared.
@@ -43,15 +63,7 @@ def demo_simple_graph():
     # returns a Runnable — the graph is not executable until this happens.
     app = graph.compile()
 
-    # # visualize the graph
-    # print("\n--- Mermaid Graph ---")
-    # print(app.get_graph().draw_mermaid())
-
-    # # save as PNG
-    # png_bytes = app.get_graph().draw_mermaid_png()
-    # with open("graph.png", "wb") as f:
-    #     f.write(png_bytes)
-    # print("\nGraph saved to graph.png")
+    visualize_graph(app, "demo_simple_graph")
 
     # run app
     result = app.invoke({"input": "hello", "output": "", "step": 0})
@@ -84,24 +96,16 @@ def demo_accumulating_state():
 
     graph = StateGraph(AccumulatingState)
 
-    print("\nGraph saved to graph_2.png")
     graph.add_node("step_one", step_one)
     graph.add_node("step_two", step_two)
+
     graph.add_edge(START, "step_one")
     graph.add_edge("step_one", "step_two")
     graph.add_edge("step_two", END)
 
     app = graph.compile()
 
-    # # visualize the graph
-    print("\n--- Mermaid Graph ---")
-    print(app.get_graph().draw_mermaid())
-
-    # save as PNG
-    # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
-    png_bytes = app.get_graph().draw_mermaid_png()
-    with open("graph_2.png", "wb") as f:
-        f.write(png_bytes)
+    visualize_graph(app, "demo_accumulating_state")
 
     result = app.invoke({"messages": ["Initial message"], "count": 0})
 
@@ -201,18 +205,12 @@ def demo_multi_node_graph():
 
     app = graph.compile()
 
-    # # visualize the graph
-    print("\n--- Mermaid Graph ---")
-    print(app.get_graph().draw_mermaid())
-
-    # save as PNG
-    png_bytes = app.get_graph().draw_mermaid_png()
-    with open("graph_3.png", "wb") as f:
-        f.write(png_bytes)
+    visualize_graph(app, "demo_multi_node_graph")
 
     # Only "input" is supplied: TypedDict keys are not required at runtime, and each
-    # node fills in its own key as the chain of edges progresses.
-    result = app.invoke({"input": "Artificial intelligence"})
+    # node fills in its own key as the chain of edges progresses. The cast tells the
+    # type checker what pyright can't infer from a partial dict literal.
+    result = app.invoke(cast(MultiStepState, {"input": "Artificial intelligence"}))
 
     print("\nMulti-Node Graph Result:")
     print(f"  Input: {result['input']}")
@@ -252,7 +250,7 @@ def exercise_first_langgraph():
         return {"answer": response.content}
 
     graph = StateGraph(QAState)
-    
+
     graph.add_node("generate_questions", generate_questions)
     graph.add_node("answer_question", answer_question)
 
@@ -262,7 +260,7 @@ def exercise_first_langgraph():
 
     app = graph.compile()
 
-    result = app.invoke({"topic": "The future of renewable energy"})
+    result = app.invoke(cast(QAState, {"topic": "The future of renewable energy"}))
 
     print("\nExercise Result:")
     print(f"  Topic: {result['topic']}")
@@ -271,9 +269,11 @@ def exercise_first_langgraph():
 
 
 if __name__ == "__main__":
-    # demo_simple_graph()
-    # demo_accumulating_state()
+    demo_simple_graph()
+    demo_accumulating_state()
+
     # go to .env LANGSMITH_TRACING=false to disable langsmith tracing for the next example, or set it to true to see the tracing in action
-    # demo_message_state()
-    # demo_multi_node_graph()
+    demo_message_state()
+
+    demo_multi_node_graph()
     exercise_first_langgraph()

@@ -17,6 +17,7 @@ from langchain_core.messages import (
 )
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_openai import ChatOpenAI
 
@@ -67,7 +68,7 @@ def demo_basic_memory():
 
     # session_id is looked up by get_session_history — the LangChain equivalent of
     # LangGraph's thread_id. Omitting it raises rather than silently sharing memory.
-    config = {"configurable": {"session_id": "user_123"}}
+    config: RunnableConfig = {"configurable": {"session_id": "user_123"}}
 
     # Conversation
     messages = [
@@ -122,8 +123,8 @@ def demo_multi_sessions():
 
     # ONE chain object serves both users — isolation comes entirely from the session_id
     # in the config, so a chain can be built once and shared across requests/threads.
-    user_a_config = {"configurable": {"session_id": "user_a"}}
-    user_b_config = {"configurable": {"session_id": "user_b"}}
+    user_a_config: RunnableConfig = {"configurable": {"session_id": "user_a"}}
+    user_b_config: RunnableConfig = {"configurable": {"session_id": "user_b"}}
 
     # User A conversation
     print("\n--- User A ---")
@@ -257,7 +258,7 @@ def demo_windowed_memory():
         history_messages_key="history",
     )
 
-    config = {"configurable": {"session_id": "windowed_test"}}
+    config: RunnableConfig = {"configurable": {"session_id": "windowed_test"}}
 
     # Simulate a conversation with more than 2 pairs
     exchanges = [
@@ -461,7 +462,7 @@ def exercise_persistent_memory():
         history_messages_key="history",
     )
 
-    config = {"configurable": {"session_id": "persistent_user"}}
+    config: RunnableConfig = {"configurable": {"session_id": "persistent_user"}}
 
     print("\nPersistent memory chatbot:")
     print("(Messages saved to SQLite database)\n")
@@ -543,7 +544,7 @@ def exercise_persistent_memory_proof():
             history_messages_key="history",
         )
 
-    config = {"configurable": {"session_id": session_id}}
+    config: RunnableConfig = {"configurable": {"session_id": session_id}}
 
     # =====================================================
     # RUN 1 -- Store preferences (simulates first session)

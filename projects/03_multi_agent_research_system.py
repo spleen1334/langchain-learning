@@ -11,7 +11,7 @@ Patterns used:
 
 import json
 import operator
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -79,7 +79,7 @@ def supervisor(state: ResearchState) -> dict:
     )
 
     try:
-        queries = json.loads(response.content)
+        queries = json.loads(str(response.content))
     except json.JSONDecodeError:
         # Fallback: split by newlines
         queries = [
@@ -128,7 +128,7 @@ def search_agent(state: SearchTaskState) -> dict:
     )
 
     try:
-        results = json.loads(response.content)
+        results = json.loads(str(response.content))
     except json.JSONDecodeError:
         results = [{"title": query, "detail": response.content}]
 
@@ -268,26 +268,29 @@ def quality_checker(state: ResearchState) -> dict:
 
     review_llm = llm.with_structured_output(QualityReview)
 
-    review = review_llm.invoke(
-        [
-            SystemMessage(
-                content=(
-                    "You are a quality reviewer. Score the report on:\n"
-                    "- Completeness: Does it cover the topic well?\n"
-                    "- Clarity: Is it well-written and easy to understand?\n"
-                    "- Actionability: Are recommendations specific?\n\n"
-                    "Score from 0.0 to 1.0. Approve if score >= 0.7.\n"
-                    "If this is iteration 2 or higher, be more lenient."
-                )
-            ),
-            HumanMessage(
-                content=(
-                    f"Topic: {state['topic']}\n"
-                    f"Iteration: {state['iteration']}\n\n"
-                    f"Report:\n{state['report']}"
-                )
-            ),
-        ]
+    review = cast(
+        QualityReview,
+        review_llm.invoke(
+            [
+                SystemMessage(
+                    content=(
+                        "You are a quality reviewer. Score the report on:\n"
+                        "- Completeness: Does it cover the topic well?\n"
+                        "- Clarity: Is it well-written and easy to understand?\n"
+                        "- Actionability: Are recommendations specific?\n\n"
+                        "Score from 0.0 to 1.0. Approve if score >= 0.7.\n"
+                        "If this is iteration 2 or higher, be more lenient."
+                    )
+                ),
+                HumanMessage(
+                    content=(
+                        f"Topic: {state['topic']}\n"
+                        f"Iteration: {state['iteration']}\n\n"
+                        f"Report:\n{state['report']}"
+                    )
+                ),
+            ]
+        ),
     )
 
     # Local variable only — used for the log message below. The ACTUAL loop exit is
@@ -377,7 +380,7 @@ def demo_research_with_streaming():
     topic = "Best practices for building multi-agent AI systems"
     print(f"Streaming Research: {topic}\n")
 
-    initial_state = {
+    initial_state: ResearchState = {
         "messages": [],
         "topic": topic,
         "search_queries": [],

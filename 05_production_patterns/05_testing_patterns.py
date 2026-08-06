@@ -30,7 +30,7 @@ class QAChain:
     def ask(self, question: str) -> str:
         prompt_value = self.prompt.invoke({"question": question})
         response = self.llm.invoke(prompt_value)
-        return response.content
+        return str(response.content)
 
 
 def test_qa_chain_with_mock():
@@ -89,7 +89,7 @@ class IntegrationTestSuite:
         results = []
         for case in test_cases:
             response = self.llm.invoke(case["question"])
-            content = response.content.lower()
+            content = str(response.content).lower()
 
             # Substring match against SEVERAL acceptable forms, not equality: LLM output
             # is non-deterministic phrasing, so exact assertions would be flaky.
@@ -139,7 +139,9 @@ class LLMEvaluator:
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
     @traceable(name="evaluate_response")
-    def evaluate(self, question: str, response: str, reference: str | None = None) -> dict:
+    def evaluate(
+        self, question: str, response: str, reference: str | None = None
+    ) -> dict:
         """Evaluate a response on multiple dimensions."""
 
         eval_prompt = ChatPromptTemplate.from_template(
@@ -178,7 +180,7 @@ Respond with ONLY a JSON object:
         )
 
         try:
-            scores = json.loads(response_obj.content)
+            scores = json.loads(str(response_obj.content))
             return scores
         except json.JSONDecodeError:
             return {"error": "Failed to parse evaluation"}
@@ -264,7 +266,7 @@ def demo_regression_testing():
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
     def qa_chain(question: str) -> str:
-        return llm.invoke(question).content
+        return str(llm.invoke(question).content)
 
     # Test cases
     test_cases = [
@@ -414,7 +416,7 @@ def correctness(run, example) -> dict:
     # Binary Y/N is easier for a model to produce reliably than a 1-10 scale, and
     # averaging the 0/1 scores across the dataset gives a clean pass-rate percentage.
     # Anything that isn't exactly "Y" counts as a failure (fail closed).
-    score = 1.0 if result.content.strip().upper() == "Y" else 0.0
+    score = 1.0 if str(result.content).strip().upper() == "Y" else 0.0
     return {"key": "correctness", "score": score}
 
 
@@ -435,7 +437,7 @@ def helpfulness(run, example) -> dict:
     result = eval_llm.invoke(
         grade_prompt.format(question=question, response=prediction)
     )
-    score = 1.0 if result.content.strip().upper() == "Y" else 0.0
+    score = 1.0 if str(result.content).strip().upper() == "Y" else 0.0
     return {"key": "helpfulness", "score": score}
 
 
@@ -489,12 +491,13 @@ def run_evaluation(dataset_name: str):
 
     for result in results:
         question = result["run"].inputs.get("question", "N/A")
-        answer = result["run"].outputs.get("answer", "N/A")
+        run_outputs = result["run"].outputs or {}
+        answer = run_outputs.get("answer", "N/A")
 
         print(f"\nQ: {question}")
         print(f"A: {answer[:80]}...")
 
-        for eval_result in result["evaluation_results"]["results"]:
+        for eval_result in result.get("evaluation_results", {}).get("results", []):
             print(f"  {eval_result.key}: {eval_result.score}")
 
     return results

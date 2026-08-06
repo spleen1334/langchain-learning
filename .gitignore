@@ -15,5 +15,8 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
-.claude 
+.claude
 chroma_db/
+
+# Generated graph visualizations
+graph/

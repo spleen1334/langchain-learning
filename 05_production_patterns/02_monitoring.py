@@ -33,8 +33,9 @@ class JSONFormatter(logging.Formatter):
         # logger.info(..., extra={"extra_data": {...}}) attaches arbitrary fields to the
         # LogRecord; merging them into the JSON is what makes logs queryable per-field
         # in an aggregator instead of requiring regex over a message string.
-        if hasattr(record, "extra_data"):
-            log_obj.update(record.extra_data)
+        extra_data = getattr(record, "extra_data", None)
+        if extra_data:
+            log_obj.update(extra_data)
 
         return json.dumps(log_obj)
 
@@ -59,7 +60,7 @@ class MetricsCollector:
     """Collect and aggregate metrics."""
 
     def __init__(self):
-        self.metrics = {
+        self.metrics: dict[str, float] = {
             "requests_total": 0,
             "errors_total": 0,
             # Running sum + count instead of a list of samples: O(1) memory, and enough
@@ -140,7 +141,7 @@ class InstrumentedLLM:
 
         try:
             response = self.llm.invoke(query)
-            result = response.content
+            result = str(response.content)
 
             # ~1.33 tokens per word heuristic. Good enough for dashboards, but for
             # billing use response.usage_metadata, which carries the provider's real counts.

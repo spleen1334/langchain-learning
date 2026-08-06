@@ -5,7 +5,7 @@ Shared state, message passing, and blackboard pattern
 
 import json
 import operator
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -179,7 +179,7 @@ def create_shared_fields_pipeline():
         # with_structured_output (used by the critic below) is the better tool.
         # The fallback wraps the raw text so the pipeline degrades instead of crashing.
         try:
-            data = json.loads(response.content)
+            data = json.loads(str(response.content))
         except json.JSONDecodeError:
             data = [{"source": "llm", "finding": response.content}]
 
@@ -205,7 +205,7 @@ def create_shared_fields_pipeline():
             ]
         )
 
-        content = response.content
+        content = str(response.content)
         analysis = content
         confidence = 0.7  # default
 
@@ -245,7 +245,7 @@ def create_shared_fields_pipeline():
         )
 
         try:
-            recs = json.loads(response.content)
+            recs = json.loads(str(response.content))
         except json.JSONDecodeError:
             recs = [response.content]
 
@@ -364,23 +364,26 @@ def create_blackboard_system():
         """Reads latest draft from blackboard, writes critique or approves."""
         latest_draft = state["drafts"][-1] if state["drafts"] else "No draft yet"
 
-        decision = critic_llm.invoke(
-            [
-                SystemMessage(
-                    content=(
-                        "You are a strict editor. Review the draft for clarity, accuracy, "
-                        "and engagement. Approve ONLY if it's genuinely good. "
-                        "If iteration is 3 or more, be more lenient."
-                    )
-                ),
-                HumanMessage(
-                    content=(
-                        f"Topic: {state['topic']}\n"
-                        f"Iteration: {state['iteration']}\n"
-                        f"Draft: {latest_draft}"
-                    )
-                ),
-            ]
+        decision = cast(
+            ApprovalDecision,
+            critic_llm.invoke(
+                [
+                    SystemMessage(
+                        content=(
+                            "You are a strict editor. Review the draft for clarity, accuracy, "
+                            "and engagement. Approve ONLY if it's genuinely good. "
+                            "If iteration is 3 or more, be more lenient."
+                        )
+                    ),
+                    HumanMessage(
+                        content=(
+                            f"Topic: {state['topic']}\n"
+                            f"Iteration: {state['iteration']}\n"
+                            f"Draft: {latest_draft}"
+                        )
+                    ),
+                ]
+            ),
         )
 
         # Hard cap in CODE, not just the prompt: a strict critic could otherwise reject
@@ -454,7 +457,6 @@ def demo_blackboard():
 
 
 if __name__ == "__main__":
-
     # demo_shared_state()
     # print("\n" + "=" * 50 + "\n")
     # demo_message_passing()

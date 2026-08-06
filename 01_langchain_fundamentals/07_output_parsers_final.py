@@ -2,6 +2,8 @@
 Output Parsers and Structured Output in LangChain V.1
 """
 
+from typing import cast
+
 from dotenv import load_dotenv
 from langchain_core.output_parsers import (
     JsonOutputParser,
@@ -111,7 +113,9 @@ def demo_structured_output():
 
     print("Task Extractions:")
     for text in texts:
-        result = chain.invoke({"text": text})
+        # with_structured_output()'s stub covers dict/TypedDict schemas too, so the
+        # return type is a union even though TaskExtraction always comes back here.
+        result = cast(TaskExtraction, chain.invoke({"text": text}))
         print(f"\nInput: {text}")
         print(f"  Task: {result.task}")
         print(f"  Priority: {result.priority}")
@@ -144,11 +148,14 @@ def demo_complex_schema():
 
     chain = prompt | structured_model
 
-    result = chain.invoke(
-        {
-            "text": "Apple Inc. is a tech company with 160,000 employees based in "
-            "Cupertino, California, USA. They make iPhones, MacBooks, and iPads."
-        }
+    result = cast(
+        Company,
+        chain.invoke(
+            {
+                "text": "Apple Inc. is a tech company with 160,000 employees based in "
+                "Cupertino, California, USA. They make iPhones, MacBooks, and iPads."
+            }
+        ),
     )
 
     print(f"Company: {result.name}")
@@ -190,12 +197,15 @@ def exercise_structured_extraction():
 
     chain = prompt | structured_model
 
-    result = chain.invoke(
-        {
-            "review": "The Dark Knight (2008) directed by Christopher Nolan is an "
-            "absolute masterpiece. Christian Bale and Heath Ledger deliver "
-            "incredible performances in this action thriller. 10/10!"
-        }
+    result = cast(
+        Movie,
+        chain.invoke(
+            {
+                "review": "The Dark Knight (2008) directed by Christopher Nolan is an "
+                "absolute masterpiece. Christian Bale and Heath Ledger deliver "
+                "incredible performances in this action thriller. 10/10!"
+            }
+        ),
     )
 
     print(f"Title: {result.title}")

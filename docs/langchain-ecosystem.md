@@ -35,7 +35,7 @@ The **orchestration** framework, and the thing that makes an "agent" rather than
 - **Checkpointers** (`MemorySaver`, `SqliteSaver`) — persist state per `thread_id`, which in turn unlocks multi-turn memory, time-travel debugging, and human-in-the-loop interrupts.
 - **Multi-agent systems** (supervisor, hierarchical subgraphs, parallel fan-out, handoffs) are all just LangGraph topologies.
 
-→ [langgraph-overview.md](langgraph-overview.md), [multi-agent-overview.md](multi-agent-overview.md) · code: [`03_langgraph_control_flow/`](../03_langgraph_control_flow/), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
+→ [langgraph-overview.md](langgraph-overview.md), [multi-agent-overview.md](multi-agent-overview.md) · code: [`03_langgraph_state_and_control_flow/`](../03_langgraph_state_and_control_flow/), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
 
 ## LangSmith
 
@@ -77,7 +77,7 @@ A useful rule of thumb for which layer you need:
 
 And regardless of which you pick, LangSmith sits on top watching it.
 
-→ code: [`03_langgraph_control_flow/03_conditional_edges.py`](../03_langgraph_control_flow/03_conditional_edges.py), [`03_langgraph_control_flow/04_cycles_loops.py`](../03_langgraph_control_flow/04_cycles_loops.py), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
+→ code: [`03_langgraph_state_and_control_flow/03_conditional_edges.py`](../03_langgraph_state_and_control_flow/03_conditional_edges.py), [`03_langgraph_state_and_control_flow/04_cycles_loops.py`](../03_langgraph_state_and_control_flow/04_cycles_loops.py), [`04_multi_agent_systems/`](../04_multi_agent_systems/)
 
 ---
 

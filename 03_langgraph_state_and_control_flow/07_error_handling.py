@@ -35,7 +35,7 @@ def with_retry(
     def decorator(func: Callable):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            last_exception = None
+            last_exception: BaseException | None = None
 
             for attempt in range(max_retries):
                 try:
@@ -55,7 +55,9 @@ def with_retry(
 
             # No sleep after the final attempt; the original exception is re-raised so
             # the caller sees the real cause rather than a generic "retries exhausted".
-            raise last_exception
+            if last_exception is not None:
+                raise last_exception
+            raise RuntimeError("with_retry: no attempts were made (max_retries <= 0)")
 
         return wrapper
 
@@ -149,9 +151,9 @@ def demo_circuit_breaker():
     for i in range(15):
         try:
             result = breaker.call(flaky_service)
-            print(f"Attempt {i+1}: ✅ {result} (state: {breaker.state})")
+            print(f"Attempt {i + 1}: ✅ {result} (state: {breaker.state})")
         except Exception as e:
-            print(f"Attempt {i+1}: ❌ {e} (state: {breaker.state})")
+            print(f"Attempt {i + 1}: ❌ {e} (state: {breaker.state})")
 
         # After attempt 7, wait long enough for recovery
         if i == 6:
@@ -174,7 +176,10 @@ class FallbackChain:
             (
                 "claude-sonnet",
                 ChatAnthropic(
-                    model="claude-sonnet-4-5-20250929", temperature=0, timeout=10
+                    model_name="claude-sonnet-4-5-20250929",
+                    temperature=0,
+                    timeout=10,
+                    stop=None,
                 ),
             ),
         ]
@@ -298,7 +303,7 @@ def create_robust_agent():
         }
 
     def finalize(state: RobustState) -> dict:
-        return state
+        return dict(state)
 
     # Build graph
     graph = StateGraph(RobustState)
@@ -339,33 +344,9 @@ def demo_robust_agent():
         )
 
         status = "✅ Success" if result["success"] else "❌ Failed"
-        print(f"Attempt {i+1}: {status}")
+        print(f"Attempt {i + 1}: {status}")
         print(f"  Retries used: {result['retry_count']}")
         print(f"  Response: {result['messages'][-1].content[:50]}...")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

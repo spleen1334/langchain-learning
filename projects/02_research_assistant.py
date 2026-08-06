@@ -4,6 +4,7 @@ Complete RAG system with conversation memory
 """
 
 from datetime import UTC, datetime
+from typing import cast
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
@@ -255,13 +256,16 @@ Question: {question}""",
 
         chain = prompt | structured_llm
 
-        response = chain.invoke(
-            {
-                "context": context,
-                "question": question,
-                "sources": ", ".join(sources),
-                "history": history.messages[-10:],
-            }
+        response = cast(
+            ResearchResponse,
+            chain.invoke(
+                {
+                    "context": context,
+                    "question": question,
+                    "sources": ", ".join(sources),
+                    "history": history.messages[-10:],
+                }
+            ),
         )
 
         # Only response.answer is stored, not the whole ResearchResponse — memory should
