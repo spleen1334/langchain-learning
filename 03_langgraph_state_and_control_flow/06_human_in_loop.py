@@ -28,6 +28,13 @@ def step_print(icon: str, label: str, detail: str = ""):
     print(f"\n{icon} [{label}] {detail}")
 
 
+def kv(**details) -> None:
+    """Print one indented 'key: value' line per keyword arg — batches the
+    scattered print(f"   Key: {value}") calls a node used to make one-by-one."""
+    for key, value in details.items():
+        print(f"   {key.replace('_', ' ')}: {value}")
+
+
 # ════════════════════════════════════════════════════════
 # DEMO 1: Interrupt for Approval
 # ════════════════════════════════════════════════════════
@@ -46,37 +53,34 @@ def demo_interrupt_for_approval():
 
     def create_draft(state: ApprovalState) -> dict:
         step_print("📝", "DRAFT NODE", "Entering create_draft node...")
-        print(f'   Request: "{state["request"]}"')
+        kv(request=f'"{state["request"]}"')
         print("   Calling LLM to generate draft...")
 
         response = llm.invoke(f"Create a professional response for: {state['request']}")
         content = str(response.content)
 
-        print(f"   Draft generated ({len(content.split())} words)")
-        print(f"   Preview: {content[:100]}...")
+        kv(words=len(content.split()), preview=f"{content[:100]}...")
         return {"draft": content}
 
     def wait_for_approval(state: ApprovalState) -> dict:
         step_print("👁️", "APPROVAL NODE", "Entering wait_for_approval node...")
-        print(f"   Approved: {state['approved']}")
-        print(
-            f"   Feedback: '{state['feedback']}'"
-            if state["feedback"]
-            else "   Feedback: (none yet)"
+        kv(
+            approved=state["approved"],
+            feedback=f"'{state['feedback']}'" if state["feedback"] else "(none yet)",
         )
         # This node is where we'll interrupt
         return dict(state)
 
     def finalize(state: ApprovalState) -> dict:
         step_print("📦", "FINALIZE NODE", "Entering finalize node...")
-        print(f"   Approved: {state['approved']}")
+        kv(approved=state["approved"])
 
         if state["approved"]:
             print("   Action: Using draft as-is (human approved)")
             return {"final": state["draft"]}
         else:
             print("   Action: Revising draft based on feedback...")
-            print(f'   Feedback: "{state["feedback"]}"')
+            kv(feedback=f'"{state["feedback"]}"')
             # Incorporate feedback
             response = llm.invoke(
                 f"Revise this draft based on feedback:\n\n"
@@ -84,7 +88,7 @@ def demo_interrupt_for_approval():
                 f"Feedback: {state['feedback']}"
             )
             content = str(response.content)
-            print(f"   Revised draft generated ({len(content.split())} words)")
+            kv(revised_words=len(content.split()))
             return {"final": content}
 
     graph = StateGraph(ApprovalState)
@@ -134,8 +138,7 @@ def demo_interrupt_for_approval():
     )
 
     step_print("⏸️", "PAUSED", "Graph execution interrupted!")
-    print(f"   Draft is ready: {result['draft'][:150]}...")
-    print(f"   Final is empty: '{result['final']}'")
+    kv(draft_ready=f"{result['draft'][:150]}...", final=f"'{result['final']}' (empty)")
     print("\n   The graph is now FROZEN. Waiting for human input.")
     print("   In a real app, your frontend would show the draft here.")
 
@@ -144,11 +147,13 @@ def demo_interrupt_for_approval():
 
     current_state = app.get_state(config)
     print("   app.get_state(config) tells us:")
-    print(f"   Next node(s): {current_state.next}")
-    print(f"   State keys: {list(current_state.values.keys())}")
-    print(f"   Draft filled: {'Yes' if current_state.values['draft'] else 'No'}")
-    print(f"   Approved: {current_state.values['approved']}")
-    print(f"   Final filled: {'Yes' if current_state.values['final'] else 'No'}")
+    kv(
+        next_nodes=current_state.next,
+        state_keys=list(current_state.values.keys()),
+        draft_filled="Yes" if current_state.values["draft"] else "No",
+        approved=current_state.values["approved"],
+        final_filled="Yes" if current_state.values["final"] else "No",
+    )
 
     # ─── PHASE 3: Human provides feedback and resume ───
     phase_banner(3, "HUMAN INJECTS FEEDBACK + RESUME")
@@ -178,8 +183,10 @@ def demo_interrupt_for_approval():
 
     # ─── RESULT ───
     step_print("✅", "WORKFLOW COMPLETE", "")
-    print(f"   Final result ({len(final_result['final'].split())} words):")
-    print(f"   {final_result['final'][:200]}...")
+    kv(
+        final_result=f"{final_result['final'][:200]}...",
+        words=len(final_result["final"].split()),
+    )
     print("\n   Graph path taken:")
     print(
         "   START -> [draft] -> ⏸️ PAUSE -> human feedback -> [approval] -> [finalize] -> END"
@@ -203,9 +210,11 @@ def demo_iterative_review():
 
     def submit_for_review(state: ReviewState) -> dict:
         step_print("📋", "SUBMIT NODE", f"Round {state['revision_count'] + 1}")
-        print(f"   Status incoming: '{state['status']}'")
-        print("   Setting status to 'pending_review'")
-        print(f"   Document preview: {state['document'][:100]}...")
+        kv(
+            status_incoming=f"'{state['status']}'",
+            setting_status="pending_review",
+            document_preview=f"{state['document'][:100]}...",
+        )
         return {"status": "pending_review"}
 
     def apply_feedback(state: ReviewState) -> dict:
@@ -218,8 +227,10 @@ def demo_iterative_review():
             return dict(state)
 
         feedback = state["review_comments"][-1]
-        print(f'   Feedback to apply: "{feedback}"')
-        print(f"   Current document: {state['document'][:80]}...")
+        kv(
+            feedback_to_apply=f'"{feedback}"',
+            current_document=f"{state['document'][:80]}...",
+        )
         print("   Calling LLM to revise...")
 
         response = llm.invoke(
@@ -229,8 +240,7 @@ def demo_iterative_review():
         )
 
         content = str(response.content)
-        print(f"   Revised document ({len(content.split())} words)")
-        print(f"   Preview: {content[:100]}...")
+        kv(words=len(content.split()), preview=f"{content[:100]}...")
 
         return {
             "document": content,
@@ -251,8 +261,10 @@ def demo_iterative_review():
 
     def finalize(state: ReviewState) -> dict:
         step_print("🏁", "DONE NODE", "Finalizing document")
-        print(f"   Total revisions: {state['revision_count']}")
-        print(f"   Final document: {state['document'][:100]}...")
+        kv(
+            total_revisions=state["revision_count"],
+            final_document=f"{state['document'][:100]}...",
+        )
         return {"status": "finalized"}
 
     graph = StateGraph(ReviewState)
@@ -302,11 +314,11 @@ def demo_iterative_review():
     )
 
     step_print("⏸️", "PAUSED", "Graph hit interrupt_before='submit'")
-    print(f'   Document ready for review: "{result["document"]}"')
-    print(f"   Revisions so far: {result['revision_count']}")
-
-    current_state = app.get_state(config)
-    print(f"   Next node: {current_state.next}")
+    kv(
+        document_ready=f'"{result["document"]}"',
+        revisions_so_far=result["revision_count"],
+        next_node=app.get_state(config).next,
+    )
     print("\n   Waiting for human reviewer...")
 
     # ─── ROUND 1: Reviewer wants changes ───
@@ -328,11 +340,11 @@ def demo_iterative_review():
     result = app.invoke(None, config)
 
     step_print("⏸️", "PAUSED AGAIN", "Graph looped back to 'submit' and paused")
-    print(f"   Revised document: {result['document'][:150]}...")
-    print(f"   Revisions so far: {result['revision_count']}")
-
-    current_state = app.get_state(config)
-    print(f"   Next node: {current_state.next}")
+    kv(
+        revised_document=f"{result['document'][:150]}...",
+        revisions_so_far=result["revision_count"],
+        next_node=app.get_state(config).next,
+    )
     print("\n   Waiting for human reviewer again...")
 
     # ─── ROUND 2: Reviewer wants more changes ───
@@ -351,8 +363,10 @@ def demo_iterative_review():
     result = app.invoke(None, config)
 
     step_print("⏸️", "PAUSED AGAIN", "Graph looped back to 'submit' and paused")
-    print(f"   Revised document: {result['document'][:150]}...")
-    print(f"   Revisions so far: {result['revision_count']}")
+    kv(
+        revised_document=f"{result['document'][:150]}...",
+        revisions_so_far=result["revision_count"],
+    )
 
     # ─── ROUND 3: Reviewer approves ───
     phase_banner(3, "REVIEWER APPROVES")
@@ -368,9 +382,11 @@ def demo_iterative_review():
 
     # ─── FINAL SUMMARY ───
     step_print("✅", "WORKFLOW COMPLETE", "")
-    print(f"   Final status: {final['status']}")
-    print(f"   Total revisions: {final['revision_count']}")
-    print(f"   Final document: {final['document'][:200]}...")
+    kv(
+        final_status=final["status"],
+        total_revisions=final["revision_count"],
+        final_document=f"{final['document'][:200]}...",
+    )
     print("\n   Full timeline:")
     print("   Round 0: START -> ⏸️ (human reviews initial doc)")
     print("   Round 1: resume -> [submit] -> [apply] -> ⏸️ (human reviews revision 1)")

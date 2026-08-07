@@ -35,6 +35,7 @@ def demo_memory_saver():
     graph = StateGraph(ChatState)
 
     graph.add_node("chat", chat)
+
     graph.add_edge(START, "chat")
     graph.add_edge("chat", END)
 
@@ -74,6 +75,7 @@ def demo_sqlite_persistence():
 
     graph = StateGraph(ChatState)
     graph.add_node("chat", chat)
+
     graph.add_edge(START, "chat")
     graph.add_edge("chat", END)
 
@@ -86,6 +88,7 @@ def demo_sqlite_persistence():
 
     # from_conn_string is a context manager because it owns the DB connection; the graph
     # must be compiled INSIDE the `with` or the checkpointer's connection is already closed.
+
     # First session
     with SqliteSaver.from_conn_string(db_path) as saver:
         app = graph.compile(checkpointer=saver)
@@ -103,6 +106,7 @@ def demo_sqlite_persistence():
 
         # PostgresSaver with a real database!
         # Simulate app restart - new session
+
     # Fresh saver, fresh compile, SAME db file + SAME thread_id => the conversation is
     # recovered from disk. This is the whole point of SqliteSaver over MemorySaver.
     with SqliteSaver.from_conn_string(db_path) as saver:
