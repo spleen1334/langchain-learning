@@ -51,7 +51,7 @@ def demo_memory_saver():
 
     # Turn 1
     result = app.invoke(
-        {"messages": [HumanMessage(content="My name is Paulo")]}, config
+        {"messages": [HumanMessage(content="My name is Anatolij")]}, config
     )
     print(f"Turn 1 - AI: {result['messages'][-1].content}")
 

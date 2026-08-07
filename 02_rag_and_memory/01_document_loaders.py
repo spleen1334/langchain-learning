@@ -85,7 +85,7 @@ def doc_structure():
         page_content="This is a sample document.",
         metadata={
             "source": "manual_creation.txt",
-            "author": "Paulo",
+            "author": "Anatolij",
             "length": 30,
             "tags": ["sample", "test"],
             "created_at": "2024-06-01",

@@ -72,7 +72,7 @@ def demo_basic_memory():
 
     # Conversation
     messages = [
-        "Hi! My name is Paulo.",
+        "Hi! My name is Anatolij.",
         "I'm learning about LangChain.",
         "What's my name and what am I learning?",
     ]
@@ -262,7 +262,7 @@ def demo_windowed_memory():
 
     # Simulate a conversation with more than 2 pairs
     exchanges = [
-        "My name is Paulo",
+        "My name is Anatolij",
         "I live in Seattle",
         "I work as an AI engineer",
         "I have 2 cats",
@@ -286,7 +286,7 @@ def demo_windowed_memory():
     # Final state - show what survived and what was lost
     print("\n" + "=" * 60)
     print("RESULT: Window only kept last 2 exchanges!")
-    print("Lost: name (Paulo), city (Seattle), AND job (AI engineer)")
+    print("Lost: name (Anatolij), city (Seattle), AND job (AI engineer)")
     print("Kept: cats + the 'remember' question")
     print(
         "This is the tradeoff: fixed memory = predictable cost, but older context is lost."
@@ -344,10 +344,10 @@ def demo_summary_memory():
 
     # --- Conversation ---
     exchanges = [
-        "My name is Paulo and I'm from Seattle",
+        "My name is Anatolij and I'm from Seattle",
         "I work as an AI engineer building RAG systems",
         "I have 2 cats named Luna and Milo",
-        "I'm building a LangChain course for Udemy",
+        "I'm taking a LangChain course on Udemy",
         "What do you know about me? List everything.",
     ]
 
@@ -554,7 +554,7 @@ def exercise_persistent_memory_proof():
     chain_v1 = build_chain()
 
     run1_messages = [
-        "My name is Paulo. I prefer dark mode themes and Python over JavaScript.",
+        "My name is Anatolij. I prefer dark mode themes and Python over JavaScript.",
         "I also like my responses concise -- no fluff.",
     ]
 

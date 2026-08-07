@@ -19,6 +19,17 @@ llm = init_chat_model("gpt-4o-mini", temperature=0.0)
 GRAPH_DIR = Path(__file__).parent / "graph"
 
 
+def log_step(title: str, **details: object) -> None:
+    """Print a titled section with aligned key/value details.
+
+    Keeps node functions free of ad-hoc print formatting — call once per
+    node with whatever's worth showing, e.g. log_step("RESEARCH", depth="1/2", query=query).
+    """
+    print(f"\n{'─' * 50}\n{title}")
+    for key, value in details.items():
+        print(f"   {key}: {value}")
+
+
 def visualize_graph(app, name: str) -> None:
     """Print the mermaid source and save a PNG render for a compiled graph.
 
@@ -52,6 +63,8 @@ def demo_self_correcting_code():
     """Self-correcting code generator."""
 
     def generate_code(state: CodeGenState) -> dict:
+        print("Generating code...")
+
         if state["iteration"] == 0:
             # First attempt
             prompt = f"Write Python code for: {state['task']}\nReturn only the code."
@@ -76,6 +89,8 @@ def demo_self_correcting_code():
         return {"code": code, "iteration": state["iteration"] + 1}
 
     def validate_code(state: CodeGenState) -> dict:
+        print("Validating...")
+
         code = state["code"]
 
         # Step 1: Does it compile?
@@ -160,7 +175,7 @@ def demo_self_correcting_code():
             "code": "",
             "errors": [],
             "iteration": 0,
-            "max_iterations": 3,
+            "max_iterations": 5,
             "success": False,
         }
     )
@@ -186,26 +201,25 @@ def demo_iterative_research():
     """Iterative research that goes deeper based on findings."""
 
     def research(state: ResearchState) -> dict:
-        print(f"\n{'─' * 50}")
-        print(f"📚 [RESEARCH] Depth {state['iteration'] + 1}/{state['max_depth']}")
-
         if state["iteration"] == 0:
             query = f"Give me 3 key facts about: {state['topic']}"
-            print(f"   Starting fresh on: {state['topic']}")
+            log_step("📚 RESEARCH", depth=f"1/{state['max_depth']}", topic=state["topic"])
         else:
             question = state["questions"][-1] if state["questions"] else "elaborate"
             query = f"Based on these findings:\n{state['findings'][-1]}\n\nGo deeper: {question}"
-            print(f"   Following up on: {question}")
+            log_step(
+                "📚 RESEARCH",
+                depth=f"{state['iteration'] + 1}/{state['max_depth']}",
+                following_up_on=question,
+            )
 
         response = llm.invoke(query)
         content = str(response.content)
-        print(f"   ✅ Found {len(content.splitlines())} lines of findings")
-        print(f"   Preview: {content[:120]}...")
+        print(f"   ✅ {len(content.splitlines())} lines — {content[:120]}...")
         return {"findings": [content]}
 
     def generate_questions(state: ResearchState) -> dict:
-        print(f"\n{'─' * 50}")
-        print("🤔 [QUESTIONING] Analyzing latest findings...")
+        log_step("🤔 QUESTIONING", analyzing="latest findings")
 
         response = llm.invoke(
             f"Based on this finding:\n{state['findings'][-1]}\n\n"
@@ -220,10 +234,7 @@ def demo_iterative_research():
         return {"questions": [content], "iteration": state["iteration"] + 1}
 
     def synthesize(state: ResearchState) -> dict:
-        print(f"\n{'─' * 50}")
-        print(
-            f"🧬 [SYNTHESIZE] Combining {len(state['findings'])} rounds of findings..."
-        )
+        log_step("🧬 SYNTHESIZE", rounds=len(state["findings"]))
 
         # Fan-in step: every accumulated round is folded into one final answer.
         all_findings = "\n\n".join(state["findings"])
@@ -236,15 +247,13 @@ def demo_iterative_research():
         return {"summary": content}
 
     def should_continue(state: ResearchState) -> Literal["research", "synthesize"]:
-        if state["iteration"] >= state["max_depth"]:
-            print(
-                f"\n🏁 [ROUTER] Max depth reached ({state['iteration']}/{state['max_depth']}) → synthesizing"
-            )
-            return "synthesize"
-        print(
-            f"\n🔄 [ROUTER] Depth {state['iteration']}/{state['max_depth']} → going deeper"
+        done = state["iteration"] >= state["max_depth"]
+        log_step(
+            "🏁 ROUTER" if done else "🔄 ROUTER",
+            depth=f"{state['iteration']}/{state['max_depth']}",
+            decision="synthesize" if done else "go deeper",
         )
-        return "research"
+        return "synthesize" if done else "research"
 
     graph = StateGraph(ResearchState)
 
