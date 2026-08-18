@@ -377,13 +377,12 @@ def create_hierarchical_system():
                 break
 
         last_ai_content = str(last_ai.content).lower() if last_ai else ""
-        if "research" in last_ai_content:
-            return "research_team"
-        elif "content" in last_ai_content:
-            return "content_team"
-        elif "analysis" in last_ai_content:
-            return "analysis_team"
-        return "research_team"  # default
+
+        for team in ("research", "content", "analysis"):
+            if team in last_ai_content:
+                return f"{team}_team"
+
+        return "research_team"  # defaul
 
     # Build parent graph — departments are compiled subgraphs as nodes
     parent = StateGraph(TeamState)
@@ -475,5 +474,5 @@ def demo_hierarchical_trace():
 
 if __name__ == "__main__":
     # demo_single_department()
-    demo_hierarchical_routing()
+    # demo_hierarchical_routing()
     demo_hierarchical_trace()

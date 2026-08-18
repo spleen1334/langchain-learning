@@ -3,7 +3,6 @@ Parallel Agent Execution in LangGraph
 Running multiple agents simultaneously
 """
 
-
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -68,13 +67,14 @@ def create_parallel_research():
 
     def synthesize(state: ParallelState) -> dict:
         """Combine all perspectives."""
+
         synthesis_prompt = f"""Synthesize these three perspectives into a comprehensive response:
 
-        RESEARCH: {state['research_result']}
+        RESEARCH: {state["research_result"]}
 
-        CREATIVE: {state['creative_result']}
+        CREATIVE: {state["creative_result"]}
 
-        TECHNICAL: {state['technical_result']}
+        TECHNICAL: {state["technical_result"]}
 
         Create a unified, well-structured response."""
 
@@ -134,7 +134,7 @@ def demo_parallel_execution():
     print(f"\n[Creative]\n{result['creative_result'][:300]}...")
     print(f"\n[Technical]\n{result['technical_result'][:300]}...")
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"[SYNTHESIZED]\n{result['final_synthesis']}")
 
 
@@ -169,7 +169,7 @@ def create_map_reduce_summarizer():
         # The "reduce" half: only the compressed summaries reach this call, which is the
         # whole point — it lets you summarize a corpus far larger than the context window.
         all_summaries = "\n\n".join(
-            [f"Summary {i+1}: {s}" for i, s in enumerate(state["summaries"])]
+            [f"Summary {i + 1}: {s}" for i, s in enumerate(state["summaries"])]
         )
 
         response = llm.invoke(
@@ -212,7 +212,7 @@ def demo_map_reduce():
 
     print("Individual summaries:")
     for i, summary in enumerate(result["summaries"]):
-        print(f"  {i+1}. {summary}")
+        print(f"  {i + 1}. {summary}")
 
     print(f"\nCombined summary:\n{result['final_summary']}")
 

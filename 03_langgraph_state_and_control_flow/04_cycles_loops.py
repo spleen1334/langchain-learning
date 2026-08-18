@@ -16,7 +16,12 @@ Self-correcting agents and iterative refinement
 
 llm = init_chat_model("gpt-4o-mini", temperature=0.0)
 
-GRAPH_DIR = Path(__file__).parent / "graph"
+GRAPH_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "graphs"
+    / "03_langgraph_state_and_control_flow"
+)
 
 
 def log_step(title: str, **details: object) -> None:
@@ -33,14 +38,13 @@ def log_step(title: str, **details: object) -> None:
 def visualize_graph(app, name: str) -> None:
     """Print the mermaid source and save a PNG render for a compiled graph.
 
-    `name` should identify the demo the graph belongs to (e.g. "demo_self_correcting_code");
-    the PNG is written to graph/graph_cl_<name>.png.
+    `name` should be the descriptive kebab-case PNG filename without its extension.
     """
     print("\n--- Mermaid Graph ---")
     print(app.get_graph().draw_mermaid())
 
-    GRAPH_DIR.mkdir(exist_ok=True)
-    png_path = GRAPH_DIR / f"graph_cl_{name}.png"
+    GRAPH_DIR.mkdir(parents=True, exist_ok=True)
+    png_path = GRAPH_DIR / f"{name}.png"
     # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
     png_path.write_bytes(app.get_graph().draw_mermaid_png())
     print(f"\nGraph saved to {png_path}")
@@ -165,7 +169,7 @@ def demo_self_correcting_code():
 
     app = graph.compile()
 
-    visualize_graph(app, "demo_self_correcting_code")
+    visualize_graph(app, "self-correcting-code-loop")
 
     print("Self-Correcting Code Generator:\n")
 
@@ -203,7 +207,9 @@ def demo_iterative_research():
     def research(state: ResearchState) -> dict:
         if state["iteration"] == 0:
             query = f"Give me 3 key facts about: {state['topic']}"
-            log_step("📚 RESEARCH", depth=f"1/{state['max_depth']}", topic=state["topic"])
+            log_step(
+                "📚 RESEARCH", depth=f"1/{state['max_depth']}", topic=state["topic"]
+            )
         else:
             question = state["questions"][-1] if state["questions"] else "elaborate"
             query = f"Based on these findings:\n{state['findings'][-1]}\n\nGo deeper: {question}"

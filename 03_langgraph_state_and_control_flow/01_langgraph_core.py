@@ -15,20 +15,24 @@ from typing_extensions import TypedDict
 
 load_dotenv()
 
-GRAPH_DIR = Path(__file__).parent / "graph"
+GRAPH_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "graphs"
+    / "03_langgraph_state_and_control_flow"
+)
 
 
 def visualize_graph(app, name: str) -> None:
     """Print the mermaid source and save a PNG render for a compiled graph.
 
-    `name` should identify the demo the graph belongs to (e.g. "demo_simple_graph");
-    the PNG is written to graph/graph_<name>.png.
+    `name` should be the descriptive kebab-case PNG filename without its extension.
     """
     print("\n--- Mermaid Graph ---")
     print(app.get_graph().draw_mermaid())
 
-    GRAPH_DIR.mkdir(exist_ok=True)
-    png_path = GRAPH_DIR / f"graph_{name}.png"
+    GRAPH_DIR.mkdir(parents=True, exist_ok=True)
+    png_path = GRAPH_DIR / f"{name}.png"
     # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
     png_path.write_bytes(app.get_graph().draw_mermaid_png())
     print(f"\nGraph saved to {png_path}")
@@ -63,7 +67,7 @@ def demo_simple_graph():
     # returns a Runnable — the graph is not executable until this happens.
     app = graph.compile()
 
-    visualize_graph(app, "demo_simple_graph")
+    visualize_graph(app, "simple-state-graph")
 
     # run app
     result = app.invoke({"input": "hello", "output": "", "step": 0})
@@ -105,7 +109,7 @@ def demo_accumulating_state():
 
     app = graph.compile()
 
-    visualize_graph(app, "demo_accumulating_state")
+    visualize_graph(app, "accumulating-state-graph")
 
     result = app.invoke({"messages": ["Initial message"], "count": 0})
 
@@ -205,7 +209,7 @@ def demo_multi_node_graph():
 
     app = graph.compile()
 
-    visualize_graph(app, "demo_multi_node_graph")
+    visualize_graph(app, "multi-node-state-graph")
 
     # Only "input" is supplied: TypedDict keys are not required at runtime, and each
     # node fills in its own key as the chain of edges progresses. The cast tells the

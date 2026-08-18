@@ -39,10 +39,10 @@ def get_weather(city: str) -> str:
     """Get the current weather for a city."""
     # Simulated weather data
     weather_data = {
-        "new york": "72°F, Sunny",
-        "london": "58°F, Cloudy",
-        "tokyo": "68°F, Clear",
-        "paris": "65°F, Partly Cloudy",
+        "new york": "29°C, Sunny",
+        "london": "22°C, Cloudy",
+        "tokyo": "28°C, Clear",
+        "paris": "26°C, Partly Cloudy",
     }
     city_lower = city.lower()
     if city_lower in weather_data:
@@ -209,8 +209,10 @@ def demo_tool_with_errors():
     tool_node = ToolNode(tools)
 
     graph = StateGraph(AgentState)
+
     graph.add_node("agent", agent_node)
     graph.add_node("tools", tool_node)
+
     graph.add_edge(START, "agent")
     graph.add_conditional_edges(
         "agent", should_continue, {"tools": "tools", "end": END}
@@ -235,5 +237,5 @@ def demo_tool_with_errors():
 
 if __name__ == "__main__":
     # demo_tool_agent()
-    # demo_tool_execution_trace()
-    demo_tool_with_errors()
+    demo_tool_execution_trace()
+    # demo_tool_with_errors()

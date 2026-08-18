@@ -10,20 +10,24 @@ load_dotenv()
 
 llm = init_chat_model("gpt-4o-mini", temperature=0.0)
 
-GRAPH_DIR = Path(__file__).parent / "graph"
+GRAPH_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "graphs"
+    / "03_langgraph_state_and_control_flow"
+)
 
 
 def visualize_graph(app, name: str) -> None:
     """Print the mermaid source and save a PNG render for a compiled graph.
 
-    `name` should identify the demo the graph belongs to (e.g. "demo_basic_routing");
-    the PNG is written to graph/graph_ce_<name>.png.
+    `name` should be the descriptive kebab-case PNG filename without its extension.
     """
     print("\n--- Mermaid Graph ---")
     print(app.get_graph().draw_mermaid())
 
-    GRAPH_DIR.mkdir(exist_ok=True)
-    png_path = GRAPH_DIR / f"graph_ce_{name}.png"
+    GRAPH_DIR.mkdir(parents=True, exist_ok=True)
+    png_path = GRAPH_DIR / f"{name}.png"
     # draw_mermaid_png() calls the remote mermaid.ink renderer, so it needs network access.
     png_path.write_bytes(app.get_graph().draw_mermaid_png())
     print(f"\nGraph saved to {png_path}")
@@ -93,7 +97,7 @@ def demo_basic_routing():
 
     app = graph.compile()
 
-    visualize_graph(app, "demo_basic_routing")
+    visualize_graph(app, "basic-conditional-routing")
 
     # Example usage
     queries = [
@@ -175,7 +179,7 @@ def demo_conditional_loop():
 
     app = graph.compile()
 
-    visualize_graph(app, "demo_conditional_loop")
+    visualize_graph(app, "conditional-loop")
 
     # Example usage
     print("\nConditional Loop Demo:\n")
@@ -284,7 +288,7 @@ def demo_multi_path_routing():
 
     app = graph.compile()
 
-    visualize_graph(app, "demo_multi_path_routing")
+    visualize_graph(app, "multi-path-routing")
 
     print("\nMulti-Path Routing Demo:\n")
 

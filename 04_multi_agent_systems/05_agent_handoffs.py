@@ -40,6 +40,7 @@ def create_customer_service_system():
 
     def triage_agent(state: HandoffState) -> dict:
         """Initial triage to route customer."""
+
         system = """You are a customer service triage agent. Your job is to:
         1. Understand the customer's need
         2. Route to the appropriate specialist:
@@ -64,6 +65,7 @@ def create_customer_service_system():
                     SystemMessage(
                         content="Provide a brief, helpful response to the customer."
                     ),
+                    # unpack the messages to flatten it
                     *state["messages"],
                 ]
             )
@@ -85,9 +87,10 @@ def create_customer_service_system():
 
     def sales_agent(state: HandoffState) -> dict:
         """Sales specialist."""
+
         # Context is injected into the SYSTEM prompt (not as a user turn) so the
         # specialist treats it as briefing material rather than customer input.
-        system = f"""You are a sales specialist. Context from triage: {state.get('context_summary', 'None')}
+        system = f"""You are a sales specialist. Context from triage: {state.get("context_summary", "None")}
 
             Help the customer with product questions and purchases.
             Be helpful and informative, not pushy."""
@@ -103,7 +106,8 @@ def create_customer_service_system():
 
     def support_agent(state: HandoffState) -> dict:
         """Technical support specialist."""
-        system = f"""You are a technical support specialist. Context from triage: {state.get('context_summary', 'None')}
+
+        system = f"""You are a technical support specialist. Context from triage: {state.get("context_summary", "None")}
 
         Help the customer with technical issues.
         Be patient and provide step-by-step guidance."""
@@ -117,7 +121,8 @@ def create_customer_service_system():
 
     def billing_agent(state: HandoffState) -> dict:
         """Billing specialist."""
-        system = f"""You are a billing specialist. Context from triage: {state.get('context_summary', 'None')}
+
+        system = f"""You are a billing specialist. Context from triage: {state.get("context_summary", "None")}
 
         Help the customer with billing questions.
         Be clear about policies and next steps."""

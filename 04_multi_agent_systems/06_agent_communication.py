@@ -325,6 +325,7 @@ def create_blackboard_system():
 
     def drafter(state: BlackboardState) -> dict:
         """Reads critiques from blackboard, writes improved draft."""
+
         context_parts = [f"Topic: {state['topic']}"]
 
         # Same node handles both first draft and revisions: the blackboard being empty
@@ -362,6 +363,7 @@ def create_blackboard_system():
 
     def critic(state: BlackboardState) -> dict:
         """Reads latest draft from blackboard, writes critique or approves."""
+
         latest_draft = state["drafts"][-1] if state["drafts"] else "No draft yet"
 
         decision = cast(
@@ -457,8 +459,6 @@ def demo_blackboard():
 
 
 if __name__ == "__main__":
-    # demo_shared_state()
-    # print("\n" + "=" * 50 + "\n")
     # demo_message_passing()
-    # print("\n" + "=" * 50 + "\n")
+    # demo_shared_state()
     demo_blackboard()

@@ -11,6 +11,7 @@ Patterns used:
 
 import json
 import operator
+from pathlib import Path
 from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
@@ -346,6 +347,7 @@ def create_research_system():
     # Send-based dispatch is wired as a CONDITIONAL edge whose function returns Send
     # objects instead of a route key; the third arg just declares the possible targets
     # so the graph can be drawn correctly.
+    # Send("search_agent",...) targets the 3rd argument - "search_agent"
     graph.add_conditional_edges("supervisor", dispatch_searches, ["search_agent"])
 
     # One edge covers all spawned instances: LangGraph waits for EVERY Send task to
@@ -374,7 +376,16 @@ def demo_research_with_streaming():
     graph = system.get_graph()
     png_data = graph.draw_mermaid_png()
 
-    with open("research_graph.png", "wb") as f:
+    output_path = (
+        Path(__file__).resolve().parents[1]
+        / "assets"
+        / "graphs"
+        / "projects"
+        / "multi-agent-research-system.png"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("wb") as f:
         f.write(png_data)
 
     topic = "Best practices for building multi-agent AI systems"

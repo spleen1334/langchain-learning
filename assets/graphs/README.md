@@ -1,17 +1,28 @@
 # Graph Visualizations
 
-PNG exports of LangGraph graph topologies, generated from the course scripts with:
+PNG exports of LangGraph graph topologies. The exporters resolve paths relative to
+the repository root, create their parent directories, and write directly to this
+canonical layout:
 
-```python
-png_bytes = app.get_graph().draw_mermaid_png()
-with open("graph.png", "wb") as f:
-    f.write(png_bytes)
+```text
+assets/graphs/
+├── 03_langgraph_state_and_control_flow/
+│   ├── simple-state-graph.png
+│   ├── accumulating-state-graph.png
+│   ├── multi-node-state-graph.png
+│   ├── basic-conditional-routing.png
+│   ├── conditional-loop.png
+│   ├── multi-path-routing.png
+│   └── self-correcting-code-loop.png
+├── 04_multi_agent_systems/
+│   └── supervisor-agent.png
+└── projects/
+    └── multi-agent-research-system.png
 ```
 
-(`app.get_graph().draw_mermaid()` prints the same thing as Mermaid source.)
+The graph-generation mechanics remain in the source demos; each exporter calls
+`app.get_graph().draw_mermaid_png()` and writes its result directly to the matching
+path above. (`app.get_graph().draw_mermaid()` prints the same graph as Mermaid
+source.)
 
-Notes:
-- **Reference pictures only** — nothing imports them.
-- **From `03_langgraph_state_and_control_flow/`** — simple graphs, accumulating state, multi-node pipelines, conditional routing, quality loops, self-correcting code generation.
-- **From `projects/multi_agent_research_system.py`** — `research_graph.png`.
-- **Output location** — scripts write these files to the current working directory, so re-running a demo drops a new PNG at the repo root; move it here.
+These are reference pictures only — nothing imports them.

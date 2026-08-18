@@ -3,6 +3,7 @@ Supervisor Architecture in LangGraph
 One agent coordinates multiple specialist agents
 """
 
+from pathlib import Path
 from typing import Annotated, Literal, cast
 
 from dotenv import load_dotenv
@@ -242,6 +243,29 @@ def demo_supervisor_trace():
             print(f"  → {msg.content}")
 
 
+def demo_supervisor_graph():
+    """Export the supervisor topology without running the agent workflow."""
+
+    agent = create_supervisor_system()
+    png_data = agent.get_graph().draw_mermaid_png()
+
+    repository_root = Path(__file__).resolve().parents[1]
+    output_path = (
+        repository_root
+        / "assets"
+        / "graphs"
+        / "04_multi_agent_systems"
+        / "supervisor-agent.png"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("wb") as f:
+        f.write(png_data)
+
+    print(f"Supervisor graph exported to {output_path}")
+
+
 if __name__ == "__main__":
     # demo_supervisor()
+    # demo_supervisor_graph()
     demo_supervisor_trace()
