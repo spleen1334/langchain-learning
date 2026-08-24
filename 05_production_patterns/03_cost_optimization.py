@@ -211,6 +211,9 @@ def demo_caching():
 class TokenBudget:
     """Track and limit token usage."""
 
+    # Real example and library:
+    # https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+
     def __init__(self, max_tokens_per_request: int = 4000):
         self.max_per_request = max_tokens_per_request
         self.usage = {"total_input": 0, "total_output": 0, "requests": 0}
@@ -301,7 +304,7 @@ if __name__ == "__main__":
     # demo_caching()
     demo_token_budgeting()
 
-    # Production version would:
+# Production version would:
 # 1. Embed the query into a vector
 # 2. Search the cache by vector similarity
 # 3. Return if similarity > threshold (e.g., 0.95)

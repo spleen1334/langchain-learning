@@ -93,6 +93,8 @@ def dispatch(state) -> list[Send]:
 ### Checkpointing and persistence
 `graph.compile(checkpointer=...)` saves a snapshot before the first node and after every node. Threads are addressed by config:
 
+Unlike `RunnableWithMessageHistory`, which stores and injects a chat transcript, a checkpointer saves every graph-state field plus execution position and checkpoint metadata. See [Conversation History vs. LangGraph Checkpointing](conversation-history-vs-checkpointing.md) for the focused comparison.
+
 ```python
 config = {"configurable": {"thread_id": "user-123"}}
 app.invoke({...}, config)   # turn 1

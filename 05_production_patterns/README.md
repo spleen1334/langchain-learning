@@ -47,13 +47,46 @@ What has to exist around an agent before it faces real users: tracing, metrics, 
 - Prompt injection, data exfiltration, and PII compliance.
 - The checks that must run on both sides of the model, not just on input.
 
+**Why the layers are ordered this way**
+- Start with deterministic, cheap checks on every request: pattern search and regular
+  expressions can flag common prompt-injection phrasing and detect/mask well-defined
+  PII such as email addresses, phone numbers, SSNs, and card numbers.
+- Use the LLM guard as a later, more flexible classification layer for intent that
+  regexes cannot reliably recognize. It costs an API call, so early deterministic
+  blocks avoid paying for it unnecessarily.
+- Always validate the output too. Combine deterministic PII redaction and harmful-
+  content checks with any policy-specific validation: a model can expose information
+  from retrieved documents or earlier conversation even when the input was clean.
+
+```mermaid
+flowchart LR
+    A[User input] --> B[Input sanitizer\nregex / pattern search]
+    B -->|suspicious| X[Block]
+    B --> C[PII detector\ndetect and mask]
+    C --> D[LLM security guard\nintent classification]
+    D -->|unsafe| X
+    D -->|safe| E[Application LLM]
+    E --> F[Output validation\nPII + harmful-content + policy checks]
+    F -->|block or redact| G[Safe response]
+    F -->|valid| H[Return response]
+```
+
 ## `05_testing_patterns.py`
 
-**What it does** — the testing ladder:
-- Unit tests with a `Mock` LLM returning a canned `AIMessage` (fast, deterministic, no API cost).
-- Integration tests asserting real responses contain expected substrings.
-- `LLMEvaluator` scoring correctness/relevance/clarity/completeness as LLM-as-judge.
-- A `RegressionTestRunner` over a test-case list with a pass threshold.
+**What it does** — a testing ladder with four distinct jobs:
+- **Unit tests** use a `Mock` LLM returning a canned `AIMessage`. They are fast,
+  deterministic, and free; use them to verify your own prompt wiring, output
+  parsing, error handling, and branching logic—not whether a model knows a fact.
+- **Integration (live smoke) tests** call a real model to confirm credentials,
+  provider compatibility, and a basic end-to-end path. Free-text answers should
+  be checked against several acceptable phrases or other criteria, rather than a
+  single exact string.
+- **Evaluations** measure answer quality across a dataset. This example uses an
+  LLM-as-judge for correctness, relevance, clarity, and completeness, alongside a
+  deterministic keyword-overlap check.
+- **Regression tests** re-run a fixed dataset after a prompt or model change and
+  compare scores with a baseline, using agreed thresholds to decide whether the
+  change is safe to release.
 
 Second half is the production approach:
 - LangSmith `Client` datasets (`create_dataset`/`create_example`).
@@ -63,4 +96,6 @@ Second half is the production approach:
 
 **What it's for**
 - Knowing whether a prompt/model change made things better.
-- LLM outputs aren't assert-equal testable, so you need scored datasets and experiment comparison instead of unit tests alone.
+- Combining deterministic tests for application behavior with dataset-based
+  evaluation for variable model behavior. Exact assertions still work well for
+  structured outputs, schemas, tool calls, routing decisions, and safety rules.

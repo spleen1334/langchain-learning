@@ -15,7 +15,9 @@ from langsmith import Client, traceable
 load_dotenv()
 
 
+# ###############################
 # === Unit Testing with Mocks ===
+# ###############################
 class QAChain:
     """Simple Q&A chain for testing."""
 
@@ -64,7 +66,9 @@ def test_qa_chain_handles_empty_response():
     assert result == ""
 
 
+# #########################################
 # === Integration Testing with Real LLM ===
+# #########################################
 class IntegrationTestSuite:
     """Integration tests with real LLM calls."""
 
@@ -129,7 +133,9 @@ def demo_integration_tests():
         print(f"   Response: {r['response'][:50]}...")
 
 
+# ############################
 # === Evaluation Framework ===
+# ############################
 class LLMEvaluator:
     """Use LLM to evaluate LLM outputs."""
 
@@ -207,7 +213,9 @@ def demo_evaluation():
         print(f"  {metric}: {score}/10")
 
 
+# ##########################
 # === Regression Testing ===
+# ##########################
 class RegressionTestRunner:
     """Run regression tests against a test dataset."""
 

@@ -20,8 +20,9 @@ from typing_extensions import TypedDict
 
 load_dotenv()
 
-
+# #######################
 # === Retry Decorator ===
+# #######################
 
 
 def with_retry(
@@ -85,7 +86,9 @@ def demo_retry_pattern():
             print(f"❌ Failed after retries: {e}")
 
 
+# #######################
 # === Circuit Breaker ===
+# #######################
 
 
 class CircuitBreaker:
@@ -163,7 +166,9 @@ def demo_circuit_breaker():
             time.sleep(0.5)
 
 
+# ############################
 # === Model Fallback Chain ===
+# ############################
 
 
 class FallbackChain:
@@ -244,7 +249,9 @@ def demo_fallback_chain():
             print(f"  ❌ Error: {e}")
 
 
+# ################################
 # === LangGraph Error Handling ===
+# ################################
 
 
 class RobustState(TypedDict):
@@ -361,8 +368,10 @@ if __name__ == "__main__":
     # demo_retry_pattern()
 
     # Run the circuit breaker demonstration
-    # demo_circuit_breaker()
+    demo_circuit_breaker()
+
     # Run the fallback chain demonstration
     # demo_fallback_chain()
+
     # Run the robust agent demonstration
-    demo_robust_agent()
+    # demo_robust_agent()

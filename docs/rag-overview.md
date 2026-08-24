@@ -124,7 +124,17 @@ RAG answers one question; memory makes it a conversation. Strategies, in ascendi
 - **Trimming** — `trim_messages(messages, max_tokens=..., strategy="last", token_counter=llm, include_system=True)`. Hard token ceiling.
 - **Windowing** — keep the last k exchanges (custom `InMemoryChatMessageHistory` subclass). Predictable cost; older facts are simply lost.
 - **Summary** — compress older turns into a running summary via a second LLM call, keep recent turns verbatim. Preserves facts at bounded cost; the demo shows name/city/job/pets all surviving.
-- **Persistence** — `SQLChatMessageHistory(session_id, connection="sqlite:///...")` so history survives process restarts. (In LangGraph the equivalent is a checkpointer keyed by `thread_id`.)
+- **Persistence** — `SQLChatMessageHistory(session_id, connection="sqlite:///...")` so history survives process restarts. LangGraph uses a checkpointer keyed by `thread_id` for conversational continuity, but a checkpoint is broader: it saves the complete graph state and execution progress, not only messages.
+
+### Message history is not a graph checkpoint
+
+`InMemoryChatMessageHistory` stores message objects. `RunnableWithMessageHistory` wraps a runnable to load that transcript by `session_id`, inject it into the prompt, and append the new input and output after the call.
+
+A LangGraph checkpointer works at the workflow level. It saves every field in the graph state—not only `messages`—together with execution information such as pending nodes, checkpoint lineage, node writes, and step metadata. That is why checkpointing supports interrupts, resume, replay, branching, and failure recovery, while message history alone does not.
+
+If a graph state contains only `messages`, the two approaches can look equivalent to the user because both provide conversational continuity. Internally, however, message history is a transcript; a checkpoint is a restorable workflow snapshot.
+
+For the full side-by-side distinction, see [Conversation History vs. LangGraph Checkpointing](conversation-history-vs-checkpointing.md).
 
 Note on follow-ups:
 

@@ -54,6 +54,7 @@ Start here when coming back cold — conceptual primers with links into the code
 - [The LangChain ecosystem](docs/langchain-ecosystem.md) — how LangChain, LangGraph and LangSmith fit together (and where "orchestration" and "monitoring" actually live). **Read this first.**
 - [LangChain](docs/langchain-overview.md) — runnables, LCEL, prompts, parsers, structured output
 - [LangGraph](docs/langgraph-overview.md) — state, reducers, edges, cycles, checkpointing, human-in-the-loop
+- [Conversation history vs. checkpointing](docs/conversation-history-vs-checkpointing.md) — transcript memory compared with full graph-state persistence
 - [LangSmith](docs/langsmith-overview.md) — tracing, monitoring, cost tracking, datasets & evaluation
 - [Multi-agent architectures](docs/multi-agent-overview.md) — supervisor, hierarchical, parallel, handoffs, blackboard
 - [RAG](docs/rag-overview.md) — the ingest→retrieve→generate pipeline, advanced retrieval, memory
