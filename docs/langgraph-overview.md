@@ -43,6 +43,72 @@ class State(TypedDict):
 - **`add_messages`** (from `langgraph.graph`) is the one to reach for with chat state: it appends, and handles message IDs/updates rather than blindly concatenating.
 - **Reducers make parallel branches safe** — two nodes writing the same key concurrently would otherwise conflict.
 
+#### Choosing a state schema: `TypedDict` vs. Pydantic `BaseModel`
+
+LangGraph accepts `TypedDict`, a dataclass, or a Pydantic `BaseModel` as its state schema. Use `TypedDict` as the default for internal graph state; use `BaseModel` when runtime validation of the graph's initial input is worth the extra cost.
+
+| | `TypedDict` | Pydantic `BaseModel` |
+|---|---|---|
+| Type checking | Static only; no runtime enforcement | Runtime parsing and validation |
+| State access in a node | `state["query"]` | `state.query` |
+| Constraints and custom validation | Not built in | `Field(...)`, nested models, and validators |
+| Type coercion | None | May coerce compatible input values unless configured strictly |
+| Runtime cost | Very low; state remains a plain dictionary | Higher; Pydantic constructs models and recursively validates fields |
+| Best fit | Trusted internal workflow state | Complex or untrusted input at a validation boundary |
+
+The performance difference comes from work done at runtime. A `TypedDict` disappears at runtime: it describes a dictionary to the type checker but does not inspect or transform values. Pydantic must construct a model, traverse fields and nested models, parse or coerce values, run constraints and validators, and build detailed errors. That cost is usually negligible beside an LLM or network call, but it can become noticeable for large or deeply nested state, high-throughput graphs, or nodes that execute repeatedly in loops.
+
+Pydantic state also has important LangGraph limitations:
+
+- validation occurs on input to the first node, not on every subsequent node update or graph output;
+- the normal graph result is still a dictionary rather than a guaranteed `BaseModel` instance;
+- a validation traceback does not necessarily identify the graph node responsible for the bad value;
+- the higher-level LangChain `create_agent` API does not support Pydantic state schemas.
+
+Therefore, using `BaseModel` as graph state does **not** make every state transition runtime-safe. Nodes should still return correct partial updates, and important invariants may need explicit validation where they are produced.
+
+For a production API, keep external contracts and internal workflow state separate:
+
+```text
+API request BaseModel
+        ↓ validate untrusted input once
+LangGraph TypedDict state
+        ↓ lightweight internal state updates
+API response BaseModel
+        ↓ validate the public response contract
+HTTP response
+```
+
+```python
+class ResearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=2_000)
+    max_results: int = Field(default=5, ge=1, le=20)
+
+
+class ResearchState(TypedDict):
+    query: str
+    max_results: int
+    findings: Annotated[list[str], operator.add]
+    answer: str
+
+
+class ResearchResponse(BaseModel):
+    answer: str
+    source_count: int = Field(ge=0)
+
+
+request = ResearchRequest.model_validate(request_body)
+result = graph.invoke(request.model_dump())
+response = ResearchResponse(
+    answer=result["answer"],
+    source_count=len(result["findings"]),
+)
+```
+
+This pattern gives the API strong validation where data crosses a trust boundary while keeping frequently updated graph state simple and fast. Reach for Pydantic graph state instead when nodes genuinely benefit from validated nested objects or attribute access and the graph's workload is not performance-sensitive.
+
+Reference: [LangGraph Graph API — state schemas and Pydantic limitations](https://docs.langchain.com/oss/python/langgraph/use-graph-api#use-pydantic-models-for-graph-state).
+
 → [`03_langgraph_state_and_control_flow/01_langgraph_core.py`](../03_langgraph_state_and_control_flow/01_langgraph_core.py)
 
 ### Nodes and edges

@@ -4,6 +4,8 @@
 
 LangGraph fundamentals: modelling an agent as a `StateGraph` of nodes and edges over a typed state object, then adding branching, loops, persistence, human approval, and failure handling.
 
+The conceptual overview also explains how to choose between lightweight `TypedDict` graph state and runtime-validated Pydantic `BaseModel` state, including the recommended production API-boundary pattern: [TypedDict vs. Pydantic BaseModel](../docs/langgraph-overview.md#choosing-a-state-schema-typeddict-vs-pydantic-basemodel).
+
 ## `01_langgraph_core.py`
 
 **What it does** — the primitives:
